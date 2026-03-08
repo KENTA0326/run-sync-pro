@@ -1,0 +1,22 @@
+### ユーザー登録のテスト
+POST http://localhost:8080/signup
+Content-Type: application/json
+
+{
+  "name": "ken",
+  "email": "ken@example.com",
+  "password": "password123"
+}
+
+### ログインのテスト
+POST http://localhost:8080/login
+Content-Type: application/json
+
+{
+  "email": "ken@example.com",
+  "password": "password123"
+}
+
+### 認証が必要なページのテスト
+GET http://localhost:8080/auth/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzMwOTg2NzYsInVzZXJfaWQiOjF9.jsPHE4y9mPYVR6K6Ky3JbDUS5f--TTq4yZYAjHDlkZg
