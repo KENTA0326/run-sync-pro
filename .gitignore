@@ -1,0 +1,4 @@
+.DS_Store
+backend/run-main
+node_modules/
+.env

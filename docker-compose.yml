@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: run-sync-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: runsync_db
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: run-sync-backend
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+    tty: true
+    stdin_open: true
+    depends_on:
+      - db
+
+volumes:
+  db-data:
