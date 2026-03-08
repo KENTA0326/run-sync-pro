@@ -1,19 +1,21 @@
 package main
 
 import (
-	"fmt"
-	"net/http"
+	"github.com/KENTA0326/run-sync-pro/database"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	fmt.Println("Server starting on :8080...")
-	
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "Hello, RunSync Pro API!")
+	// DB接続
+	database.Connect()
+
+	r := gin.Default()
+
+	r.GET("/", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"message": "Hello, RunSync Pro API with Gin and GORM!",
+		})
 	})
 
-	// 8080ポートで待機
-	if err := http.ListenAndServe(":8080", nil); err != nil {
-		panic(err)
-	}
+	r.Run(":8080")
 }
