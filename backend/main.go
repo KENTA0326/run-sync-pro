@@ -27,6 +27,11 @@ func main() {
 	r.POST("/signup", handler.SignUp)
 	r.POST("/login", handler.Login)
 
+	// VDOT計算（認証不要で利用可能）
+	r.POST("/vdot/calculate", handler.VDOTCalculate)
+	// スプリット計算（フルマラソン・10km単位ページング）
+	r.POST("/splits/fullmarathon", handler.FullMarathonSplits)
+
 	// --- ここから追加 ---
 	authGroup := r.Group("/auth")
 	authGroup.Use(middleware.AuthMiddleware()) // 関所を設置

@@ -44,6 +44,10 @@
 <script setup lang="ts">
 import type { SignUpRequest, SignUpResponse } from '~/types/api'
 
+definePageMeta({
+  layout: false,
+})
+
 const name = ref('')
 const email = ref('')
 const password = ref('')
