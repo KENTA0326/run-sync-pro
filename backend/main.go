@@ -53,6 +53,9 @@ func main() {
 		// 走行ログ管理
 		authGroup.POST("/training-logs", handler.CreateTrainingLog)
 		authGroup.GET("/training-logs", handler.ListTrainingLogs)
+
+		// 解析（月別レポート・Goroutine並列集計）
+		authGroup.GET("/analysis", handler.MonthlyReport)
 	}
 	// --- ここまで ---
 

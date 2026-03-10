@@ -1,0 +1,11 @@
+# 事前に scripts/build-backend.sh で main をビルドした場合に使うイメージ。
+# Docker 内で go build しないため、メモリ不足になりにくい。
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates
+
+WORKDIR /app
+COPY main .
+
+EXPOSE 8080
+CMD ["./main"]
