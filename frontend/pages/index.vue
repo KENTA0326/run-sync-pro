@@ -1,43 +1,20 @@
 <template>
-  <div class="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-8">
-    <div class="p-8 bg-white rounded shadow-md w-full max-w-md space-y-4">
-      <h1 class="text-xl font-bold text-gray-800">RunSync Pro</h1>
-      <p class="text-gray-600 text-sm">認証付きAPIの動作確認用です。</p>
+  <div class="rounded-lg bg-white p-6 shadow-md">
+    <h1 class="mb-1 text-xl font-bold text-gray-800">ユーザートップ</h1>
+    <p class="text-sm text-gray-600">ログイン済みのユーザー向けトップページです。</p>
 
-      <button
-        type="button"
-        class="w-full p-2 text-white bg-blue-500 rounded hover:bg-blue-600"
-        @click="fetchMe"
-      >
-        認証情報を取得（/auth/me）
-      </button>
-
-      <div v-if="me" class="p-3 bg-gray-50 rounded text-sm text-gray-800">
-        <p><strong>user_id:</strong> {{ me.user_id }}</p>
-        <p><strong>message:</strong> {{ me.message }}</p>
-      </div>
-      <p v-if="meError" class="text-red-500 text-sm">{{ meError }}</p>
-
-      <NuxtLink to="/login" class="block text-center text-blue-600 text-sm">ログインへ</NuxtLink>
+    <div class="mt-4 rounded bg-gray-50 p-4 text-sm text-gray-800">
+      <p class="font-semibold">次にやること</p>
+      <ul class="mt-2 list-disc space-y-1 pl-5 text-gray-700">
+        <li>メニューから「VDOT」を開いて計算してみる</li>
+        <li>今後はここに「直近の走行ログ」や「目標タイム」などを表示していく想定</li>
+      </ul>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { AuthMeResponse } from '~/types/api'
-
-const api = useApi()
-const me = ref<AuthMeResponse | null>(null)
-const meError = ref('')
-
-async function fetchMe() {
-  me.value = null
-  meError.value = ''
-  try {
-    const data = await api.get<AuthMeResponse>('/auth/me')
-    me.value = data
-  } catch (err) {
-    meError.value = api.getErrorMessage(err)
-  }
-}
+definePageMeta({
+  middleware: 'auth',
+})
 </script>

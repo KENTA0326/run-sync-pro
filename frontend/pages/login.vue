@@ -23,6 +23,10 @@
 <script setup lang="ts">
 import type { LoginRequest, LoginResponse } from '~/types/api'
 
+definePageMeta({
+  layout: false,
+})
+
 const email = ref('')
 const password = ref('')
 const error = ref('')
