@@ -7,6 +7,10 @@ RUN apk update && apk add --no-cache git
 # コンテナ内の作業ディレクトリ
 WORKDIR /app
 
+# 8GB Mac 等でビルド OOM を防ぐ: 並列1・GC を強め・スレッド1
+ENV GOGC=50
+ENV GOMAXPROCS=1
+
 # ホストのファイルをコンテナにコピー
 COPY . .
 

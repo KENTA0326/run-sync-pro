@@ -89,6 +89,13 @@
         >
           VDOT
         </NuxtLink>
+        <NuxtLink
+          to="/analysis"
+          class="block rounded px-3 py-2 text-sm text-gray-800 hover:bg-gray-100"
+          @click="menuOpen = false"
+        >
+          解析
+        </NuxtLink>
 
         <button
           type="button"

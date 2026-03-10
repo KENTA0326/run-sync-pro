@@ -119,6 +119,24 @@ export interface FullMarathonSplitsResponse {
   rows: SplitRow[]
 }
 
+// --- 解析（月別レポート・Goroutine並列集計）---
+export interface MonthlyReport {
+  year_month: string
+  total_distance: number
+  total_duration: number
+  run_count: number
+  avg_pace_sec_per_km: number
+  avg_vdot: number
+  max_vdot: number
+}
+
+export interface AnalysisResponse {
+  monthly_reports: MonthlyReport[]
+  total_distance: number
+  total_duration: number
+  total_run_count: number
+}
+
 // --- エラー（BE の gin.H{"error": "..."} に合わせる）---
 export interface ApiErrorBody {
   error: string

@@ -1,4 +1,5 @@
 .DS_Store
 backend/run-main
+backend/main
 node_modules/
 .env
