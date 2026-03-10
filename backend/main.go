@@ -36,6 +36,7 @@ func main() {
 	authGroup := r.Group("/auth")
 	authGroup.Use(middleware.AuthMiddleware()) // 関所を設置
 	{
+		// 認証チェック用のシンプルなエンドポイント
 		authGroup.GET("/me", func(c *gin.Context) {
 			userID, _ := c.Get("userID")
 			c.JSON(200, gin.H{
@@ -43,6 +44,15 @@ func main() {
 				"message": "認証に成功しています！",
 			})
 		})
+
+		// シューズ管理
+		authGroup.POST("/shoes", handler.CreateShoe)
+		authGroup.GET("/shoes", handler.ListShoes)
+		authGroup.DELETE("/shoes/:id", handler.DeleteShoe)
+
+		// 走行ログ管理
+		authGroup.POST("/training-logs", handler.CreateTrainingLog)
+		authGroup.GET("/training-logs", handler.ListTrainingLogs)
 	}
 	// --- ここまで ---
 

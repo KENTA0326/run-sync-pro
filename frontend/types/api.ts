@@ -56,6 +56,51 @@ export interface VDOTCalculateResponse {
   }
 }
 
+// --- シューズ ---
+export interface Shoe {
+  id: number
+  user_id: number
+  brand: string
+  model: string
+  purchase_date: string
+  total_distance: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateShoeRequest {
+  brand: string
+  model: string
+  purchase_date: string
+}
+
+// --- 走行ログ ---
+export interface TrainingLog {
+  id: number
+  user_id: number
+  training_date: string
+  distance: number
+  duration: number
+  pace: string
+  memo: string
+  kind: number
+  shoe_id: number
+  shoe: Shoe
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateTrainingLogRequest {
+  training_date: string
+  distance: number
+  duration: number
+  pace: string
+  memo: string
+  kind: number
+  shoe_id: number
+}
+
 // --- Splits ---
 export interface FullMarathonSplitsRequest {
   pace_sec_per_km: number
