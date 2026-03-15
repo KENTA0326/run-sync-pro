@@ -2,6 +2,7 @@ package service
 
 import (
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/KENTA0326/run-sync-pro/model"
@@ -51,6 +52,8 @@ func AnalyzeByMonth(logs []model.TrainingLog) AnalysisResponse {
 	}
 
 	ch := make(chan monthResult, len(byMonth))
+	var wg sync.WaitGroup
+	wg.Add(len(byMonth))
 
 	for yearMonth, list := range byMonth {
 		// ループ変数をgoroutineに渡すためコピー
@@ -59,6 +62,7 @@ func AnalyzeByMonth(logs []model.TrainingLog) AnalysisResponse {
 		copy(group, list)
 
 		go func() {
+			defer wg.Done()
 			var dist float64
 			var dur int
 			var vdotSum float64
@@ -98,10 +102,12 @@ func AnalyzeByMonth(logs []model.TrainingLog) AnalysisResponse {
 		}()
 	}
 
-	// 全goroutineの結果を回収
+	// 全goroutineの完了を待機してから結果を回収
+	wg.Wait()
+	close(ch)
 	results := make([]monthResult, 0, len(byMonth))
-	for i := 0; i < len(byMonth); i++ {
-		results = append(results, <-ch)
+	for r := range ch {
+		results = append(results, r)
 	}
 
 	// 月順にソート
