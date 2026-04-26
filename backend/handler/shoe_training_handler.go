@@ -240,4 +240,3 @@ func ListTrainingLogs(c *gin.Context) {
 
 	c.JSON(http.StatusOK, logs)
 }
-

@@ -1,0 +1,14 @@
+pre-commit:
+  parallel: true
+  commands:
+    gofmt:
+      root: "backend"
+      glob: "**/*.go"
+      run: |
+        gofmt -w {staged_files}
+        git add {staged_files}
+    golangci-lint:
+      root: "backend"
+      glob: "**/*.go"
+      run: golangci-lint run ./... --timeout=3m
+

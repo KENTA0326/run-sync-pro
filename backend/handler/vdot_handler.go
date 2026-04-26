@@ -10,7 +10,7 @@ import (
 // VDOTCalculateInput リクエストボディ
 type VDOTCalculateInput struct {
 	DistanceMeters float64 `json:"distance_meters" binding:"required,gt=0"`
-	TimeSeconds   float64 `json:"time_seconds" binding:"required,gt=0"`
+	TimeSeconds    float64 `json:"time_seconds" binding:"required,gt=0"`
 	// リーゲル公式の指数（任意）。指定がなければ 1.08（標準的な市民ランナー）扱い
 	RiegelExponent float64 `json:"riegel_exponent" binding:"omitempty,gt=1,lt=2"`
 }
@@ -37,9 +37,9 @@ func VDOTCalculate(c *gin.Context) {
 	riegel := service.CalculateRiegelPredictions(input.DistanceMeters, input.TimeSeconds, exponent)
 
 	c.JSON(http.StatusOK, gin.H{
-		"vdot":        vdot,
-		"paces":       paces,
-		"riegel_exponent": exponent,
+		"vdot":               vdot,
+		"paces":              paces,
+		"riegel_exponent":    exponent,
 		"riegel_predictions": riegel,
 	})
 }

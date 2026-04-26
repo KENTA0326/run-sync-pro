@@ -1,0 +1,31 @@
+run:
+  timeout: 3m
+  tests: true
+  issues-exit-code: 1
+  skip-dirs:
+    - tmp
+    - vendor
+
+output:
+  sort-results: true
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters-settings:
+  govet:
+    enable-all: false
+    disable:
+      - fieldalignment

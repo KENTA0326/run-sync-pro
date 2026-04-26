@@ -13,8 +13,8 @@ type FullMarathonSplitsInput struct {
 }
 
 type FullMarathonSplitsResponse struct {
-	Page       int               `json:"page"`
-	TotalPages int               `json:"total_pages"`
+	Page       int                `json:"page"`
+	TotalPages int                `json:"total_pages"`
 	Rows       []service.SplitRow `json:"rows"`
 }
 
@@ -55,4 +55,3 @@ func FullMarathonSplits(c *gin.Context) {
 		Rows:       all[start:end],
 	})
 }
-

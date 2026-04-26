@@ -38,11 +38,11 @@ func CalculateVDOT(distanceMeters, timeSeconds float64) float64 {
 
 // TrainingPaces はVDOTに基づく各強度の推奨ペース（1kmあたりの秒数）
 type TrainingPaces struct {
-	EasyMinSecPerKm   float64 `json:"easy_min_sec_per_km"`   // ジョグ（下限）
-	EasyMaxSecPerKm   float64 `json:"easy_max_sec_per_km"`   // ジョグ（上限）
-	MarathonSecPerKm  float64 `json:"marathon_sec_per_km"`   // マラソンペース
-	ThresholdSecPerKm float64 `json:"threshold_sec_per_km"`  // 閾値走
-	IntervalSecPerKm  float64 `json:"interval_sec_per_km"`   // インターバル
+	EasyMinSecPerKm    float64 `json:"easy_min_sec_per_km"`   // ジョグ（下限）
+	EasyMaxSecPerKm    float64 `json:"easy_max_sec_per_km"`   // ジョグ（上限）
+	MarathonSecPerKm   float64 `json:"marathon_sec_per_km"`   // マラソンペース
+	ThresholdSecPerKm  float64 `json:"threshold_sec_per_km"`  // 閾値走
+	IntervalSecPerKm   float64 `json:"interval_sec_per_km"`   // インターバル
 	RepetitionSecPerKm float64 `json:"repetition_sec_per_km"` // レペティション
 }
 
@@ -160,9 +160,9 @@ func PredictRaceTimeSeconds(vdot float64, distanceMeters float64) int {
 	}
 
 	// 探索範囲（秒）。上限は距離に応じてざっくり長めに取る
-	lo := 60.0                // 1分
-	hi := distanceMeters * 3  // 1m=3sec(=5:00/km)相当を起点
-	if hi < 600 {             // 最低10分
+	lo := 60.0               // 1分
+	hi := distanceMeters * 3 // 1m=3sec(=5:00/km)相当を起点
+	if hi < 600 {            // 最低10分
 		hi = 600
 	}
 	if distanceMeters >= 42195 {

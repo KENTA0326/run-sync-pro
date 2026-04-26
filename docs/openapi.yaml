@@ -1,0 +1,602 @@
+openapi: 3.0.3
+info:
+  title: Run Sync Pro API
+  description: |
+    ランニング記録・シューズ管理・VDOT計算・スプリット計算を行う API です。
+    - 認証不要: サインアップ・ログイン・VDOT計算・スプリット計算
+    - 認証必要（Bearer JWT）: シューズ・走行ログ・月別解析
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: ローカル開発
+
+tags:
+  - name: 認証
+    description: サインアップ・ログイン
+  - name: VDOT
+    description: VDOT 計算（認証不要）
+  - name: スプリット
+    description: フルマラソンスプリット（認証不要）
+  - name: 認証チェック
+    description: JWT 検証
+  - name: シューズ
+    description: シューズ CRUD（認証必要）
+  - name: 走行ログ
+    description: 走行ログ CRUD（認証必要）
+  - name: 解析
+    description: 月別レポート（認証必要）
+
+paths:
+  /signup:
+    post:
+      tags: [認証]
+      summary: ユーザー登録
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignUpRequest'
+      responses:
+        '200':
+          description: 登録完了
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /login:
+    post:
+      tags: [認証]
+      summary: ログイン
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: ログイン成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: リクエスト不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: メールまたはパスワードが正しくない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /vdot/calculate:
+    post:
+      tags: [VDOT]
+      summary: VDOT 計算
+      description: 距離(m)とタイム(秒)から VDOT 値・トレーニングペース・リーゲル予想タイムを返す（認証不要）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VDOTCalculateRequest'
+      responses:
+        '200':
+          description: 計算結果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VDOTCalculateResponse'
+        '400':
+          description: パラメータ不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /splits/fullmarathon:
+    post:
+      tags: [スプリット]
+      summary: フルマラソンスプリット
+      description: 1km ごとの通過タイムを 10km 単位でページングして返す（認証不要）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FullMarathonSplitsRequest'
+      responses:
+        '200':
+          description: スプリット一覧
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FullMarathonSplitsResponse'
+        '400':
+          description: パラメータ不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/me:
+    get:
+      tags: [認証チェック]
+      summary: 認証確認
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 認証成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id:
+                    type: number
+                    format: uint
+                  message:
+                    type: string
+                    example: 認証に成功しています！
+        '401':
+          description: 未認証またはトークン無効
+
+  /auth/shoes:
+    get:
+      tags: [シューズ]
+      summary: シューズ一覧
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: アクティブなシューズ一覧（購入日・ID の新しい順）
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Shoe'
+        '401':
+          description: 未認証
+    post:
+      tags: [シューズ]
+      summary: シューズ登録
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateShoeRequest'
+      responses:
+        '200':
+          description: 登録したシューズ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Shoe'
+        '400':
+          description: バリデーションエラー（例: purchase_date が YYYY-MM-DD でない）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: 未認証
+
+  /auth/shoes/{id}:
+    delete:
+      tags: [シューズ]
+      summary: シューズ削除（論理削除）
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: 削除完了（またはすでに削除済み）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: 不正な ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: 未認証
+        '404':
+          description: シューズが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/training-logs:
+    get:
+      tags: [走行ログ]
+      summary: 走行ログ一覧
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 走行ログ一覧（日付・ID の新しい順、シューズ情報付き）
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrainingLog'
+        '401':
+          description: 未認証
+    post:
+      tags: [走行ログ]
+      summary: 走行ログ登録
+      description: 登録時に指定シューズの累計距離をトランザクションで加算する
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTrainingLogRequest'
+      responses:
+        '200':
+          description: 保存完了
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: バリデーションエラーまたはシューズが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: 未認証
+
+  /auth/analysis:
+    get:
+      tags: [解析]
+      summary: 月別走行レポート
+      description: 走行ログを月ごとに集計（総距離・総時間・走行回数・平均VDOT 等）
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 月別レポート＋全体合計
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisResponse'
+        '401':
+          description: 未認証
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: ログインで取得した token をそのまま指定
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: エラーメッセージ（日本語）
+
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    SignUpRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    LoginResponse:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: JWT（Authorization: Bearer に設定して利用）
+
+    VDOTCalculateRequest:
+      type: object
+      required: [distance_meters, time_seconds]
+      properties:
+        distance_meters:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+          description: レース距離（メートル）。3km以上推奨
+        time_seconds:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+          description: レースタイム（秒）
+        riegel_exponent:
+          type: number
+          format: double
+          minimum: 1
+          maximum: 2
+          description: リーゲル公式の指数。省略時 1.08
+
+    TrainingPaces:
+      type: object
+      description: 1kmあたりの秒数
+      properties:
+        easy_min_sec_per_km:
+          type: number
+        easy_max_sec_per_km:
+          type: number
+        marathon_sec_per_km:
+          type: number
+        threshold_sec_per_km:
+          type: number
+        interval_sec_per_km:
+          type: number
+        repetition_sec_per_km:
+          type: number
+
+    RacePredictions:
+      type: object
+      description: リーゲル公式による予想タイム（秒）
+      properties:
+        full_seconds:
+          type: integer
+          description: フルマラソン
+        half_seconds:
+          type: integer
+          description: ハーフ
+        ten_k_seconds:
+          type: integer
+          description: 10km
+        five_k_seconds:
+          type: integer
+          description: 5km
+
+    VDOTCalculateResponse:
+      type: object
+      properties:
+        vdot:
+          type: number
+          format: double
+        paces:
+          $ref: '#/components/schemas/TrainingPaces'
+        riegel_exponent:
+          type: number
+        riegel_predictions:
+          $ref: '#/components/schemas/RacePredictions'
+
+    FullMarathonSplitsRequest:
+      type: object
+      required: [pace_sec_per_km]
+      properties:
+        pace_sec_per_km:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+          description: 1kmあたりの秒数
+        page:
+          type: integer
+          minimum: 1
+          description: 10km単位のページ。省略時 1
+
+    SplitRow:
+      type: object
+      properties:
+        km:
+          type: number
+          description: 通過距離（1, 2, ... 42, 42.195）
+        label:
+          type: string
+          description: 表示用（"1km", "Finish" 等）
+        cumulative_seconds:
+          type: integer
+          description: スタートからの累積秒
+
+    FullMarathonSplitsResponse:
+      type: object
+      properties:
+        page:
+          type: integer
+        total_pages:
+          type: integer
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/SplitRow'
+
+    CreateShoeRequest:
+      type: object
+      required: [brand, model, purchase_date]
+      properties:
+        brand:
+          type: string
+        model:
+          type: string
+        purchase_date:
+          type: string
+          format: date
+          description: YYYY-MM-DD
+
+    Shoe:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: uint
+        user_id:
+          type: integer
+          format: uint
+        brand:
+          type: string
+        model:
+          type: string
+        purchase_date:
+          type: string
+          format: date-time
+        total_distance:
+          type: number
+          description: 累計走行距離(km)
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateTrainingLogRequest:
+      type: object
+      required: [training_date, distance, duration, pace, kind, shoe_id]
+      properties:
+        training_date:
+          type: string
+          format: date
+          description: YYYY-MM-DD
+        distance:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+          description: 距離(km)
+        duration:
+          type: integer
+          exclusiveMinimum: 0
+          description: 合計秒数
+        pace:
+          type: string
+          example: "5:30"
+        memo:
+          type: string
+        kind:
+          type: integer
+          minimum: 0
+          maximum: 3
+          description: "0:ジョグ, 1:LSD, 2:ペース走, 3:インターバル"
+        shoe_id:
+          type: integer
+          format: uint
+          description: 使用したシューズID
+
+    TrainingLog:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: uint
+        user_id:
+          type: integer
+          format: uint
+        training_date:
+          type: string
+          format: date-time
+        distance:
+          type: number
+        duration:
+          type: integer
+        pace:
+          type: string
+        memo:
+          type: string
+        kind:
+          type: integer
+        shoe_id:
+          type: integer
+          format: uint
+        shoe:
+          $ref: '#/components/schemas/Shoe'
+          description: Preload されたシューズ情報
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    MonthlyReport:
+      type: object
+      properties:
+        year_month:
+          type: string
+          example: "2026-03"
+        total_distance:
+          type: number
+          description: km
+        total_duration:
+          type: integer
+          description: 秒
+        run_count:
+          type: integer
+        avg_pace_sec_per_km:
+          type: number
+          description: 秒/km
+        avg_vdot:
+          type: number
+        max_vdot:
+          type: number
+
+    AnalysisResponse:
+      type: object
+      properties:
+        monthly_reports:
+          type: array
+          items:
+            $ref: '#/components/schemas/MonthlyReport'
+        total_distance:
+          type: number
+        total_duration:
+          type: integer
+        total_run_count:
+          type: integer

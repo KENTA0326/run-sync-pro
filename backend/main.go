@@ -23,7 +23,7 @@ func main() {
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
-	
+
 	r.POST("/signup", handler.SignUp)
 	r.POST("/login", handler.Login)
 
@@ -53,6 +53,8 @@ func main() {
 		// 走行ログ管理
 		authGroup.POST("/training-logs", handler.CreateTrainingLog)
 		authGroup.GET("/training-logs", handler.ListTrainingLogs)
+		authGroup.GET("/training-logs/formatted", handler.ListTrainingLogsFormatted)
+		authGroup.POST("/training-logs/stream", handler.ImportTrainingLogsStream)
 
 		// 解析（月別レポート・Goroutine並列集計）
 		authGroup.GET("/analysis", handler.MonthlyReport)

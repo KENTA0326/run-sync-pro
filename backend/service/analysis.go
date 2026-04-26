@@ -10,13 +10,13 @@ import (
 
 // MonthlyReport は1ヶ月分の集計結果
 type MonthlyReport struct {
-	YearMonth       string  `json:"year_month"`        // "2026-03"
-	TotalDistance   float64 `json:"total_distance"`    // km
-	TotalDuration   int     `json:"total_duration"`    // 秒
+	YearMonth       string  `json:"year_month"`     // "2026-03"
+	TotalDistance   float64 `json:"total_distance"` // km
+	TotalDuration   int     `json:"total_duration"` // 秒
 	RunCount        int     `json:"run_count"`
 	AvgPaceSecPerKm float64 `json:"avg_pace_sec_per_km"` // 秒/km（フロントで "5:30" 表示用）
-	AvgVDOT         float64 `json:"avg_vdot"`           // 月内の走行から算出した平均VDOT
-	MaxVDOT         float64 `json:"max_vdot"`           // 月内の最高VDOT（走力の目安）
+	AvgVDOT         float64 `json:"avg_vdot"`            // 月内の走行から算出した平均VDOT
+	MaxVDOT         float64 `json:"max_vdot"`            // 月内の最高VDOT（走力の目安）
 }
 
 // AnalysisResponse は解析APIのレスポンス
@@ -29,13 +29,13 @@ type AnalysisResponse struct {
 
 // monthResult はGoroutineからChannelに送る1ヶ月分の集計
 type monthResult struct {
-	YearMonth        string
-	TotalDistance    float64
-	TotalDuration    int
-	RunCount         int
-	AvgPaceSecPerKm  float64
-	AvgVDOT          float64
-	MaxVDOT          float64
+	YearMonth       string
+	TotalDistance   float64
+	TotalDuration   int
+	RunCount        int
+	AvgPaceSecPerKm float64
+	AvgVDOT         float64
+	MaxVDOT         float64
 }
 
 // AnalyzeByMonth は走行ログを月ごとに並列集計する（Goroutine + Channel）
@@ -91,13 +91,13 @@ func AnalyzeByMonth(logs []model.TrainingLog) AnalysisResponse {
 				avgVdot = vdotSum / float64(vdotCount)
 			}
 			ch <- monthResult{
-				YearMonth:        ym,
-				TotalDistance:    dist,
-				TotalDuration:    dur,
-				RunCount:         len(group),
-				AvgPaceSecPerKm:  avgPace,
-				AvgVDOT:          avgVdot,
-				MaxVDOT:          maxVdot,
+				YearMonth:       ym,
+				TotalDistance:   dist,
+				TotalDuration:   dur,
+				RunCount:        len(group),
+				AvgPaceSecPerKm: avgPace,
+				AvgVDOT:         avgVdot,
+				MaxVDOT:         maxVdot,
 			}
 		}()
 	}
@@ -122,13 +122,13 @@ func AnalyzeByMonth(logs []model.TrainingLog) AnalysisResponse {
 	var totalCount int
 	for i, r := range results {
 		reports[i] = MonthlyReport{
-			YearMonth:        r.YearMonth,
-			TotalDistance:    r.TotalDistance,
-			TotalDuration:    r.TotalDuration,
-			RunCount:         r.RunCount,
-			AvgPaceSecPerKm:  r.AvgPaceSecPerKm,
-			AvgVDOT:          r.AvgVDOT,
-			MaxVDOT:          r.MaxVDOT,
+			YearMonth:       r.YearMonth,
+			TotalDistance:   r.TotalDistance,
+			TotalDuration:   r.TotalDuration,
+			RunCount:        r.RunCount,
+			AvgPaceSecPerKm: r.AvgPaceSecPerKm,
+			AvgVDOT:         r.AvgVDOT,
+			MaxVDOT:         r.MaxVDOT,
 		}
 		totalDist += r.TotalDistance
 		totalDur += r.TotalDuration
