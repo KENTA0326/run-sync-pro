@@ -3,7 +3,7 @@ package handler
 import (
 	"net/http"
 
-	"github.com/KENTA0326/run-sync-pro/service"
+	"github.com/KENTA0326/run-sync-pro/internal/apperrors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,26 +15,27 @@ type VDOTCalculateInput struct {
 	RiegelExponent float64 `json:"riegel_exponent" binding:"omitempty,gt=1,lt=2"`
 }
 
-// VDOTCalculate 距離(m)とタイム(秒)を受け取り、VDOT値とトレーニングペースを返す
-func VDOTCalculate(c *gin.Context) {
+// VDOTCalculate は距離(m)とタイム(秒)を受け取り、VDOT値とトレーニングペースを返す。
+// POST /api/v1/vdot/calculate （レガシー: POST /vdot/calculate）
+func (h *Handlers) VDOTCalculate(c *gin.Context) {
 	var input VDOTCalculateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "distance_meters と time_seconds を正しく指定してください"})
+		respondHTTPError(c, apperrors.BadRequest("distance_meters と time_seconds を正しく指定してください", err))
 		return
 	}
 
-	vdot := service.CalculateVDOT(input.DistanceMeters, input.TimeSeconds)
+	vdot := h.vdot.CalculateVDOT(input.DistanceMeters, input.TimeSeconds)
 	if vdot <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "VDOTを算出できません。距離とタイムを確認してください（3km以上推奨）"})
+		respondHTTPError(c, apperrors.BadRequest("VDOTを算出できません。距離とタイムを確認してください（3km以上推奨）"))
 		return
 	}
 
-	paces := service.CalculateTrainingPaces(vdot)
+	paces := h.vdot.CalculateTrainingPaces(vdot)
 	exponent := input.RiegelExponent
 	if exponent == 0 {
 		exponent = 1.08
 	}
-	riegel := service.CalculateRiegelPredictions(input.DistanceMeters, input.TimeSeconds, exponent)
+	riegel := h.vdot.CalculateRiegelPredictions(input.DistanceMeters, input.TimeSeconds, exponent)
 
 	c.JSON(http.StatusOK, gin.H{
 		"vdot":               vdot,

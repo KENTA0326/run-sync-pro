@@ -140,6 +140,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiPath } from '~/composables/apiPaths'
 import type { CreateTrainingLogRequest, Shoe, TrainingLog } from '~/types/api'
 
 definePageMeta({
@@ -194,7 +195,7 @@ function formatKind(k: number): string {
 
 async function fetchShoes() {
   try {
-    const data = await api.get<Shoe[]>('/auth/shoes')
+    const data = await api.get<Shoe[]>(apiPath.shoes)
     shoes.value = data
   } catch (err) {
     // エラーはフォーム上でまとめて表示するのでここでは握りつぶす
@@ -206,7 +207,7 @@ async function fetchLogs() {
   logsLoading.value = true
   error.value = ''
   try {
-    const data = await api.get<TrainingLog[]>('/auth/training-logs')
+    const data = await api.get<TrainingLog[]>(apiPath.trainingLogs)
     logs.value = data
   } catch (err) {
     error.value = api.getErrorMessage(err)
@@ -243,7 +244,7 @@ async function handleCreate() {
       kind: kind.value,
       shoe_id: shoeId.value,
     }
-    await api.post<unknown>('/auth/training-logs', body)
+    await api.post<unknown>(apiPath.trainingLogs, body)
     success.value = '走行ログを保存しました。'
 
     // 入力をリセット

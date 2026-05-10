@@ -26,8 +26,14 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
-      - name: Go test
-        run: go test ./...
+      - name: Go test (race)
+        run: go test -race -count=1 ./...
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Struct tag check (binding / gorm)
+        run: go run ./cmd/tagcheck .
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6

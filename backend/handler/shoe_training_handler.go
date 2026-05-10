@@ -1,12 +1,13 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
-	"time"
 
-	"github.com/KENTA0326/run-sync-pro/database"
+	"github.com/KENTA0326/run-sync-pro/internal/apperrors"
 	"github.com/KENTA0326/run-sync-pro/model"
+	"github.com/KENTA0326/run-sync-pro/internal/timeutil"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -18,7 +19,6 @@ func getUserIDFromContext(c *gin.Context) (uint, bool) {
 	if !ok {
 		return 0, false
 	}
-	// JWTのMapClaimsから来るので float64 想定
 	switch v := raw.(type) {
 	case float64:
 		return uint(v), true
@@ -42,23 +42,23 @@ type createShoeInput struct {
 	PurchaseDate string `json:"purchase_date" binding:"required"` // "2006-01-02" 形式を想定
 }
 
-// POST /auth/shoes
-func CreateShoe(c *gin.Context) {
+// POST /api/v1/shoes （レガシー: POST /auth/shoes）
+func (h *Handlers) CreateShoe(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "ユーザー情報を取得できません"})
+		respondHTTPError(c, apperrors.UnauthorizedMsg("ユーザー情報を取得できません"))
 		return
 	}
 
 	var input createShoeInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondHTTPError(c, apperrors.BadRequest("入力内容を確認してください", err))
 		return
 	}
 
-	purchaseDate, err := time.Parse("2006-01-02", input.PurchaseDate)
+	purchaseDate, err := timeutil.ParseCalendarDate(input.PurchaseDate)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "purchase_date は YYYY-MM-DD 形式で指定してください"})
+		respondHTTPError(c, apperrors.BadRequest("purchase_date は YYYY-MM-DD 形式で指定してください", err))
 		return
 	}
 
@@ -69,69 +69,69 @@ func CreateShoe(c *gin.Context) {
 		PurchaseDate: purchaseDate,
 	}
 
-	if err := database.DB.Create(&shoe).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "シューズの登録に失敗しました"})
+	if err := h.db.Create(&shoe).Error; err != nil {
+		respondHTTPError(c, apperrors.InternalMsg("シューズの登録に失敗しました", apperrors.Annotate("db create shoe", err)))
 		return
 	}
 
 	c.JSON(http.StatusOK, shoe)
 }
 
-// GET /auth/shoes
-func ListShoes(c *gin.Context) {
+// GET /api/v1/shoes （レガシー: GET /auth/shoes）
+func (h *Handlers) ListShoes(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "ユーザー情報を取得できません"})
+		respondHTTPError(c, apperrors.UnauthorizedMsg("ユーザー情報を取得できません"))
 		return
 	}
 
 	var shoes []model.Shoe
-	if err := database.DB.
+	if err := h.db.
 		Where("user_id = ? AND is_active = ?", userID, true).
 		Order("purchase_date DESC, id DESC").
 		Find(&shoes).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "シューズ一覧の取得に失敗しました"})
+		respondHTTPError(c, apperrors.InternalMsg("シューズ一覧の取得に失敗しました", apperrors.Annotate("db list shoes", err)))
 		return
 	}
 
 	c.JSON(http.StatusOK, shoes)
 }
 
-// DELETE /auth/shoes/:id （論理削除: is_active=false）
-func DeleteShoe(c *gin.Context) {
+// DELETE /api/v1/shoes/:id （論理削除: is_active=false、レガシー: DELETE /auth/shoes/:id）
+func (h *Handlers) DeleteShoe(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "ユーザー情報を取得できません"})
+		respondHTTPError(c, apperrors.UnauthorizedMsg("ユーザー情報を取得できません"))
 		return
 	}
 
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "不正なIDです"})
+		respondHTTPError(c, apperrors.BadRequest("不正なIDです", err))
 		return
 	}
 
 	var shoe model.Shoe
-	if err := database.DB.
+	if err := h.db.
 		Where("id = ? AND user_id = ?", id, userID).
 		First(&shoe).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "シューズが見つかりません"})
+		mapped := apperrors.FromGORM(err)
+		if errors.Is(mapped, apperrors.ErrNotFound) {
+			respondHTTPError(c, apperrors.NotFoundMsg("シューズが見つかりません", err))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "シューズの取得に失敗しました"})
+		respondHTTPError(c, apperrors.InternalMsg("シューズの取得に失敗しました", apperrors.Annotate("db first shoe", mapped)))
 		return
 	}
 
 	if !shoe.IsActive {
-		// すでに非アクティブなら 200 を返してもよい
 		c.JSON(http.StatusOK, gin.H{"message": "すでに削除済みです"})
 		return
 	}
 
-	if err := database.DB.Model(&shoe).Update("is_active", false).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "シューズの削除に失敗しました"})
+	if err := h.db.Model(&shoe).Update("is_active", false).Error; err != nil {
+		respondHTTPError(c, apperrors.InternalMsg("シューズの削除に失敗しました", apperrors.Annotate("db update shoe inactive", err)))
 		return
 	}
 
@@ -150,36 +150,33 @@ type createTrainingLogInput struct {
 	ShoeID       uint    `json:"shoe_id" binding:"required"` // 使用シューズ
 }
 
-// POST /auth/training-logs
-func CreateTrainingLog(c *gin.Context) {
+// POST /api/v1/training-logs （レガシー: POST /auth/training-logs）
+func (h *Handlers) CreateTrainingLog(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "ユーザー情報を取得できません"})
+		respondHTTPError(c, apperrors.UnauthorizedMsg("ユーザー情報を取得できません"))
 		return
 	}
 
 	var input createTrainingLogInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "入力内容が正しくありません。日付・距離・時間・種類・シューズを確認してください。",
-		})
+		respondHTTPError(c, apperrors.BadRequest("入力内容が正しくありません。日付・距離・時間・種類・シューズを確認してください。", err))
 		return
 	}
 
-	trainingDate, err := time.Parse("2006-01-02", input.TrainingDate)
+	trainingDate, err := timeutil.ParseCalendarDate(input.TrainingDate)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "training_date は YYYY-MM-DD 形式で指定してください"})
+		respondHTTPError(c, apperrors.BadRequest("training_date は YYYY-MM-DD 形式で指定してください", err))
 		return
 	}
 
-	err = database.DB.Transaction(func(tx *gorm.DB) error {
-		// シューズの存在と所有者チェック
+	err = h.db.Transaction(func(tx *gorm.DB) error {
 		var shoe model.Shoe
 		if err := tx.Where("id = ? AND user_id = ?", input.ShoeID, userID).First(&shoe).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				return gin.Error{Err: err, Type: gin.ErrorTypePublic, Meta: "シューズが見つかりません"}
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return apperrors.NotFoundMsg("シューズが見つかりません", err)
 			}
-			return err
+			return apperrors.Annotate("create training log: shoe lookup", err)
 		}
 
 		log := model.TrainingLog{
@@ -194,47 +191,40 @@ func CreateTrainingLog(c *gin.Context) {
 		}
 
 		if err := tx.Create(&log).Error; err != nil {
-			return err
+			return apperrors.Annotate("create training log: insert log", err)
 		}
 
-		// 累計距離を加算
 		if err := tx.Model(&shoe).
 			Update("total_distance", gorm.Expr("total_distance + ?", input.Distance)).Error; err != nil {
-			return err
+			return apperrors.Annotate("create training log: update shoe distance", err)
 		}
 
 		return nil
 	})
 
 	if err != nil {
-		if ginErr, ok := err.(gin.Error); ok && ginErr.Type == gin.ErrorTypePublic {
-			if msg, ok := ginErr.Meta.(string); ok {
-				c.JSON(http.StatusBadRequest, gin.H{"error": msg})
-				return
-			}
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "走行ログの保存に失敗しました"})
+		respondPreferVisible(c, err, "走行ログの保存に失敗しました")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "走行ログを保存しました"})
 }
 
-// GET /auth/training-logs
-func ListTrainingLogs(c *gin.Context) {
+// GET /api/v1/training-logs （レガシー: GET /auth/training-logs）
+func (h *Handlers) ListTrainingLogs(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "ユーザー情報を取得できません"})
+		respondHTTPError(c, apperrors.UnauthorizedMsg("ユーザー情報を取得できません"))
 		return
 	}
 
 	var logs []model.TrainingLog
-	if err := database.DB.
+	if err := h.db.
 		Where("user_id = ?", userID).
 		Preload("Shoe").
 		Order("training_date DESC, id DESC").
 		Find(&logs).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "走行ログの取得に失敗しました"})
+		respondHTTPError(c, apperrors.InternalMsg("走行ログの取得に失敗しました", apperrors.Annotate("db list training logs", err)))
 		return
 	}
 

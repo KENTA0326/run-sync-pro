@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/KENTA0326/run-sync-pro/internal/apperrors"
 	"github.com/KENTA0326/run-sync-pro/database"
+	"github.com/KENTA0326/run-sync-pro/internal/timeutil"
 	"github.com/KENTA0326/run-sync-pro/model"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -44,12 +46,12 @@ func (d *APIDate) UnmarshalJSON(data []byte) error {
 
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
-		return fmt.Errorf("date must be a string: %w", err)
+		return fmt.Errorf("APIDate: %w", apperrors.BadRequest("日付は文字列で指定してください", err))
 	}
 
-	t, err := time.Parse(apiDateLayout, s)
+	t, err := timeutil.ParseCalendarDate(s)
 	if err != nil {
-		return fmt.Errorf("date must be in YYYY-MM-DD format")
+		return fmt.Errorf("APIDate: %w", apperrors.BadRequest("日付は YYYY-MM-DD 形式で指定してください", err))
 	}
 	d.Time = t
 	return nil
@@ -114,21 +116,21 @@ func toTrainingLogFormattedResponse(log model.TrainingLog) trainingLogFormattedR
 	}
 }
 
-// GET /auth/training-logs/formatted
-func ListTrainingLogsFormatted(c *gin.Context) {
+// GET /api/v1/training-logs/formatted （レガシー: GET /auth/training-logs/formatted）
+func (h *Handlers) ListTrainingLogsFormatted(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "ユーザー情報を取得できません"})
+		respondHTTPError(c, apperrors.UnauthorizedMsg("ユーザー情報を取得できません"))
 		return
 	}
 
 	var logs []model.TrainingLog
-	if err := database.DB.
+	if err := h.db.
 		Where("user_id = ?", userID).
 		Preload("Shoe").
 		Order("training_date DESC, id DESC").
 		Find(&logs).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "走行ログの取得に失敗しました"})
+		respondHTTPError(c, apperrors.InternalMsg("走行ログの取得に失敗しました", apperrors.Annotate("db formatted logs", err)))
 		return
 	}
 
@@ -150,25 +152,21 @@ type streamTrainingLogInput struct {
 	ShoeID       uint    `json:"shoe_id"`
 }
 
-type publicError struct {
-	message string
-}
-
-func (e publicError) Error() string {
-	return e.message
-}
-
 // TrainingLogImportOptions はストリーム取り込み時のオプション引数。
-// Functional Options Pattern の適用先として使う。
+// フィールドは同一パッケージの Option からのみ設定し、外部からはゲッター経由で読む。
 type TrainingLogImportOptions struct {
-	MaxItems             int
-	Atomic               bool
-	DisallowUnknownField bool
+	maxItems             int
+	atomic               bool
+	disallowUnknownField bool
 }
+
+func (o TrainingLogImportOptions) MaxItems() int              { return o.maxItems }
+func (o TrainingLogImportOptions) Atomic() bool               { return o.atomic }
+func (o TrainingLogImportOptions) DisallowUnknownField() bool { return o.disallowUnknownField }
 
 func (o TrainingLogImportOptions) validate() error {
-	if o.MaxItems <= 0 {
-		return fmt.Errorf("max items must be greater than 0")
+	if o.maxItems <= 0 {
+		return fmt.Errorf("max items invalid: %w", apperrors.ErrInvalidInput)
 	}
 	return nil
 }
@@ -179,58 +177,58 @@ type TrainingLogImportOption func(*TrainingLogImportOptions)
 // WithImportMaxItems は 1 リクエストで受け取る上限件数を設定する。
 func WithImportMaxItems(max int) TrainingLogImportOption {
 	return func(o *TrainingLogImportOptions) {
-		o.MaxItems = max
+		o.maxItems = max
 	}
 }
 
 // WithImportAtomic は取り込みを 1 トランザクションで行うかを設定する。
 func WithImportAtomic(atomic bool) TrainingLogImportOption {
 	return func(o *TrainingLogImportOptions) {
-		o.Atomic = atomic
+		o.atomic = atomic
 	}
 }
 
 // WithImportDisallowUnknownField は未知フィールドを拒否するかを設定する。
 func WithImportDisallowUnknownField(disallow bool) TrainingLogImportOption {
 	return func(o *TrainingLogImportOptions) {
-		o.DisallowUnknownField = disallow
+		o.disallowUnknownField = disallow
 	}
 }
 
 // NewTrainingLogImportOptions はデフォルト値を入れた上でオプションを適用し、最終検証する。
 func NewTrainingLogImportOptions(opts ...TrainingLogImportOption) (TrainingLogImportOptions, error) {
 	o := TrainingLogImportOptions{
-		MaxItems:             defaultImportMaxItems,
-		Atomic:               defaultImportAtomic,
-		DisallowUnknownField: defaultImportDisallowUnknown,
+		maxItems:             defaultImportMaxItems,
+		atomic:               defaultImportAtomic,
+		disallowUnknownField: defaultImportDisallowUnknown,
 	}
 	for _, opt := range opts {
 		opt(&o)
 	}
 	if err := o.validate(); err != nil {
-		return TrainingLogImportOptions{}, err
+		return TrainingLogImportOptions{}, apperrors.Annotate("NewTrainingLogImportOptions", err)
 	}
 	return o, nil
 }
 
 func validateStreamTrainingLogInput(in streamTrainingLogInput) error {
 	if in.TrainingDate.Time.IsZero() {
-		return publicError{message: "training_date は YYYY-MM-DD 形式で指定してください"}
+		return apperrors.BadRequest("training_date は YYYY-MM-DD 形式で指定してください")
 	}
 	if in.Distance <= 0 {
-		return publicError{message: "distance は 0 より大きい値で指定してください"}
+		return apperrors.BadRequest("distance は 0 より大きい値で指定してください")
 	}
 	if in.Duration <= 0 {
-		return publicError{message: "duration は 0 より大きい値で指定してください"}
+		return apperrors.BadRequest("duration は 0 より大きい値で指定してください")
 	}
 	if in.Pace == "" {
-		return publicError{message: "pace は必須です"}
+		return apperrors.BadRequest("pace は必須です")
 	}
 	if in.Kind < 0 || in.Kind > 3 {
-		return publicError{message: "kind は 0-3 の範囲で指定してください"}
+		return apperrors.BadRequest("kind は 0-3 の範囲で指定してください")
 	}
 	if in.ShoeID == 0 {
-		return publicError{message: "shoe_id は必須です"}
+		return apperrors.BadRequest("shoe_id は必須です")
 	}
 	return nil
 }
@@ -244,15 +242,13 @@ func importStreamTrainingLogs(
 ) (int, error) {
 	count := 0
 	for decoder.More() {
-		if count >= options.MaxItems {
-			return count, publicError{
-				message: fmt.Sprintf("1回の取り込み上限（%d件）を超えています", options.MaxItems),
-			}
+		if count >= options.MaxItems() {
+			return count, apperrors.BadRequest(fmt.Sprintf("1回の取り込み上限（%d件）を超えています", options.MaxItems()))
 		}
 
 		var in streamTrainingLogInput
 		if err := decoder.Decode(&in); err != nil {
-			return count, publicError{message: "JSON 配列の要素を読み取れませんでした"}
+			return count, apperrors.BadRequest("JSON 配列の要素を読み取れませんでした", err)
 		}
 		if err := validateStreamTrainingLogInput(in); err != nil {
 			return count, err
@@ -263,9 +259,9 @@ func importStreamTrainingLogs(
 			Where("id = ? AND user_id = ?", in.ShoeID, userID).
 			First(&shoe).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return count, publicError{message: "指定した shoe_id のシューズが見つかりません"}
+				return count, apperrors.NotFoundMsg("指定した shoe_id のシューズが見つかりません", err)
 			}
-			return count, err
+			return count, apperrors.Annotate("import stream first shoe", err)
 		}
 
 		log := model.TrainingLog{
@@ -279,23 +275,23 @@ func importStreamTrainingLogs(
 			ShoeID:       in.ShoeID,
 		}
 		if err := db.WithContext(ctx).Create(&log).Error; err != nil {
-			return count, err
+			return count, apperrors.Annotate("import stream insert log", err)
 		}
 		if err := db.WithContext(ctx).Model(&shoe).
 			Update("total_distance", gorm.Expr("total_distance + ?", in.Distance)).Error; err != nil {
-			return count, err
+			return count, apperrors.Annotate("import stream update shoe km", err)
 		}
 		count++
 	}
 	return count, nil
 }
 
-// POST /auth/training-logs/stream
+// POST /api/v1/training-logs/import/stream （レガシー: POST /auth/training-logs/stream）
 // 形式: [{"training_date":"2026-04-22","distance":10.0,"duration":3600,"pace":"6:00","kind":0,"shoe_id":1}, ...]
-func ImportTrainingLogsStream(c *gin.Context) {
+func (h *Handlers) ImportTrainingLogsStream(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "ユーザー情報を取得できません"})
+		respondHTTPError(c, apperrors.UnauthorizedMsg("ユーザー情報を取得できません"))
 		return
 	}
 
@@ -306,65 +302,59 @@ func ImportTrainingLogsStream(c *gin.Context) {
 		WithImportDisallowUnknownField(defaultImportDisallowUnknown),
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "取り込み設定が不正です"})
+		respondHTTPError(c, apperrors.InternalMsg("取り込み設定が不正です", err))
 		return
 	}
 
 	decoder := json.NewDecoder(c.Request.Body)
-	if options.DisallowUnknownField {
+	if options.DisallowUnknownField() {
 		decoder.DisallowUnknownFields()
 	}
 
 	token, err := decoder.Token()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "JSON の読み取りに失敗しました"})
+		respondHTTPError(c, apperrors.BadRequest("JSON の読み取りに失敗しました", err))
 		return
 	}
 	delim, ok := token.(json.Delim)
 	if !ok || delim != '[' {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "トップレベルは JSON 配列で送信してください"})
+		respondHTTPError(c, apperrors.BadRequest("トップレベルは JSON 配列で送信してください"))
 		return
 	}
 
 	createdCount := 0
-	if options.Atomic {
-		err = database.WithGlobalTx(c.Request.Context(), func(tx *gorm.DB) error {
+	if options.Atomic() {
+		err = database.WithTx(c.Request.Context(), h.db, func(tx *gorm.DB) error {
 			var importErr error
 			createdCount, importErr = importStreamTrainingLogs(c.Request.Context(), tx, userID, decoder, options)
 			return importErr
 		})
 	} else {
-		createdCount, err = importStreamTrainingLogs(c.Request.Context(), database.DB, userID, decoder, options)
+		createdCount, err = importStreamTrainingLogs(c.Request.Context(), h.db, userID, decoder, options)
 	}
 	if err != nil {
-		var pubErr publicError
-		if errors.As(err, &pubErr) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": pubErr.Error()})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "走行ログの一括取込に失敗しました"})
+		respondPreferVisible(c, err, "走行ログの一括取込に失敗しました")
 		return
 	}
 
 	endToken, err := decoder.Token()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "JSON 配列の終端が不正です"})
+		respondHTTPError(c, apperrors.BadRequest("JSON 配列の終端が不正です", err))
 		return
 	}
 	endDelim, ok := endToken.(json.Delim)
 	if !ok || endDelim != ']' {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "JSON 配列の終端が不正です"})
+		respondHTTPError(c, apperrors.BadRequest("JSON 配列の終端が不正です"))
 		return
 	}
 
-	// 終端 "]" のあとに余計な JSON がないか確認する。
 	var extra json.RawMessage
 	if err := decoder.Decode(&extra); err != nil && !errors.Is(err, io.EOF) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "JSON の末尾に不正なデータがあります"})
+		respondHTTPError(c, apperrors.BadRequest("JSON の末尾に不正なデータがあります", err))
 		return
 	}
 	if len(extra) > 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "JSON の末尾に不正なデータがあります"})
+		respondHTTPError(c, apperrors.BadRequest("JSON の末尾に不正なデータがあります"))
 		return
 	}
 

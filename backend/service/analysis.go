@@ -1,12 +1,35 @@
 package service
 
 import (
+	"runtime"
 	"sort"
 	"sync"
-	"time"
 
+	"github.com/KENTA0326/run-sync-pro/internal/timeutil"
 	"github.com/KENTA0326/run-sync-pro/model"
 )
+
+const (
+	groupByMonthParallelThreshold = 512
+	groupByMonthMaxWorkers        = 8
+)
+
+//
+// ── 並行処理メモ（go func と sync.WaitGroup） ───────────────────────────────
+//
+// • groupLogsByMonth: 大量ログ時にシャードごとに go func を起動し wg.Add/defer wg.Done/wg.Wait で合流する。
+//
+// • AnalyzeByMonth  : 月キー単位で go func を起動し、同様に WaitGroup で揃えたあとチャネルを閉じて回収する。
+//
+// ゴルーチン関連で起きやすい問題:
+//
+// • Add と Done が対応しない → Wait が永遠ブロックしたり早期に抜けたりしてデッドロック・誤結果になる。
+// • defer wg.Done() をしない分岐がある →同上。ワーカ入口で defer が無難。
+// • go func がループ変数をクロージャでキャプチャ → 競合。ym / slice コピーでそのイテレーションの値だけを渡す。
+// • 送信がブロックしたまま誰も受信しない → ゴルーチンが終わらずリークし得る。ここではバッファ len(byMonth) と
+//   wg.Wait の後での close/channel drain で「送り側が済むまで親が読む」を満たす。
+//
+// 月キーは timeutil.MonthKey で JST に換算してから "YYYY-MM" にしている（DB の Asia/Tokyo と語義を合わせる）。
 
 // MonthlyReport は1ヶ月分の集計結果
 type MonthlyReport struct {
@@ -27,6 +50,17 @@ type AnalysisResponse struct {
 	TotalRunCount  int             `json:"total_run_count"`
 }
 
+type analyzerStd struct{}
+
+// NewAnalyzer は本番用の月別解析の具体実装を返す。
+func NewAnalyzer() *analyzerStd {
+	return &analyzerStd{}
+}
+
+func (analyzerStd) AnalyzeByMonth(logs []model.TrainingLog) AnalysisResponse {
+	return AnalyzeByMonth(logs)
+}
+
 // monthResult はGoroutineからChannelに送る1ヶ月分の集計
 type monthResult struct {
 	YearMonth       string
@@ -38,20 +72,77 @@ type monthResult struct {
 	MaxVDOT         float64
 }
 
-// AnalyzeByMonth は走行ログを月ごとに並列集計する（Goroutine + Channel）
+// groupLogsByMonth はログを年月キーでまとめる。
+// 件数が少ないときは単一ゴルーチンで map に触れ、mutex 不要。
+// 件数が多いときは go func + sync.WaitGroup（Add / defer Done / Wait）でシャード処理し、
+// ワーカーごとにローカル map を作り、共有 map へは sync.Mutex で直列マージする。
+// 複数ゴルーチンから同じ map を同時に読み書きするとランタイムが fatal になるため、共有 map への書き込みは必ず保護する。
+func groupLogsByMonth(logs []model.TrainingLog) map[string][]model.TrainingLog {
+	if len(logs) < groupByMonthParallelThreshold {
+		byMonth := make(map[string][]model.TrainingLog)
+		for _, log := range logs {
+			ym := timeutil.MonthKey(log.TrainingDate)
+			byMonth[ym] = append(byMonth[ym], log)
+		}
+		return byMonth
+	}
+
+	workers := min(groupByMonthMaxWorkers, runtime.NumCPU(), len(logs))
+	if workers < 2 {
+		byMonth := make(map[string][]model.TrainingLog)
+		for _, log := range logs {
+			ym := timeutil.MonthKey(log.TrainingDate)
+			byMonth[ym] = append(byMonth[ym], log)
+		}
+		return byMonth
+	}
+
+	chunk := (len(logs) + workers - 1) / workers
+	byMonth := make(map[string][]model.TrainingLog)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for w := 0; w < workers; w++ {
+		start := w * chunk
+		if start >= len(logs) {
+			break
+		}
+		end := start + chunk
+		if end > len(logs) {
+			end = len(logs)
+		}
+		part := logs[start:end]
+		wg.Add(1) // Done は常にこの go func の defer で呼ぶ（呼び漏れ防止）
+		go func(chunk []model.TrainingLog) {
+			defer wg.Done()
+			local := make(map[string][]model.TrainingLog)
+			for _, log := range chunk {
+				ym := timeutil.MonthKey(log.TrainingDate)
+				local[ym] = append(local[ym], log)
+			}
+			mu.Lock()
+			for ym, list := range local {
+				if existing, ok := byMonth[ym]; ok {
+					byMonth[ym] = append(existing, list...)
+				} else {
+					byMonth[ym] = list
+				}
+			}
+			mu.Unlock()
+		}(part)
+	}
+	wg.Wait()
+	return byMonth
+}
+
+// AnalyzeByMonth は走行ログを月ごとに並列集計する（go func + sync.WaitGroup + バッファチャネル）。
 func AnalyzeByMonth(logs []model.TrainingLog) AnalysisResponse {
 	if len(logs) == 0 {
 		return AnalysisResponse{MonthlyReports: []MonthlyReport{}}
 	}
 
-	// 月ごとにグループ化（key: "2006-01"）
-	byMonth := make(map[string][]model.TrainingLog)
-	for _, log := range logs {
-		ym := log.TrainingDate.Format("2006-01")
-		byMonth[ym] = append(byMonth[ym], log)
-	}
+	byMonth := groupLogsByMonth(logs)
 
-	ch := make(chan monthResult, len(byMonth))
+	ch := make(chan monthResult, len(byMonth)) // 各ワーカが一度ずつ送信するので詰まりにくくする（送信ブロックでのリーク回避）
 	var wg sync.WaitGroup
 	wg.Add(len(byMonth))
 
@@ -62,7 +153,7 @@ func AnalyzeByMonth(logs []model.TrainingLog) AnalysisResponse {
 		copy(group, list)
 
 		go func() {
-			defer wg.Done()
+			defer wg.Done() // パニック時も Done させるために defer
 			var dist float64
 			var dur int
 			var vdotSum float64
@@ -102,8 +193,7 @@ func AnalyzeByMonth(logs []model.TrainingLog) AnalysisResponse {
 		}()
 	}
 
-	// 全goroutineの完了を待機してから結果を回収
-	wg.Wait()
+	wg.Wait()   // 全ワーカ終了まで待つ（送信完了を保証してからチャネルを閉じる）
 	close(ch)
 	results := make([]monthResult, 0, len(byMonth))
 	for r := range ch {
@@ -145,10 +235,10 @@ func AnalyzeByMonth(logs []model.TrainingLog) AnalysisResponse {
 
 // ThisMonthSummary は「今月」の集計だけを返す（ダッシュボード用）
 func ThisMonthSummary(logs []model.TrainingLog) (distance float64, duration int, count int, avgPaceSecPerKm float64) {
-	now := time.Now()
+	now := timeutil.NowJST()
 	thisMonth := now.Format("2006-01")
 	for _, t := range logs {
-		if t.TrainingDate.Format("2006-01") == thisMonth {
+		if timeutil.MonthKey(t.TrainingDate) == thisMonth {
 			distance += t.Distance
 			duration += t.Duration
 			count++

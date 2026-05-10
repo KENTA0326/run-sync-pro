@@ -220,3 +220,22 @@ func CalculateRacePredictions(vdot float64) RacePredictions {
 		FiveKSeconds: PredictRaceTimeSeconds(vdot, 5000),
 	}
 }
+
+type vdotStd struct{}
+
+// NewVDOTCalculator は本番用の VDOT まわりの具体実装を返す。
+func NewVDOTCalculator() *vdotStd {
+	return &vdotStd{}
+}
+
+func (vdotStd) CalculateVDOT(distanceMeters, timeSeconds float64) float64 {
+	return CalculateVDOT(distanceMeters, timeSeconds)
+}
+
+func (vdotStd) CalculateTrainingPaces(vdot float64) TrainingPaces {
+	return CalculateTrainingPaces(vdot)
+}
+
+func (vdotStd) CalculateRiegelPredictions(distanceMeters, timeSeconds, exponent float64) RacePredictions {
+	return CalculateRiegelPredictions(distanceMeters, timeSeconds, exponent)
+}

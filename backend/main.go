@@ -1,22 +1,27 @@
 package main
 
 import (
+	"log"
+	"strings"
 	"time" // これが必要になります
 
 	"github.com/KENTA0326/run-sync-pro/database"
 	"github.com/KENTA0326/run-sync-pro/handler"
-	"github.com/KENTA0326/run-sync-pro/middleware"
+	"github.com/KENTA0326/run-sync-pro/internal/httpserver"
 	"github.com/gin-contrib/cors" // これを追加
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	database.Connect()
+	h := handler.NewDefaultHandlers(database.DB)
+
 	r := gin.Default()
 
 	// CORS設定: 公式ライブラリで一括設定（これが一番確実です）
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3001"},
+		// Docker  compose は 3001→コンテナ3000。ホストで nuxt dev 単体は 3000 が多い。
+		AllowOrigins:     []string{"http://localhost:3001", "http://localhost:3000"},
 		AllowMethods:     []string{"POST", "GET", "OPTIONS", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -24,42 +29,16 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	r.POST("/signup", handler.SignUp)
-	r.POST("/login", handler.Login)
+	httpserver.RegisterRoutes(r, h)
 
-	// VDOT計算（認証不要で利用可能）
-	r.POST("/vdot/calculate", handler.VDOTCalculate)
-	// スプリット計算（フルマラソン・10km単位ページング）
-	r.POST("/splits/fullmarathon", handler.FullMarathonSplits)
-
-	// --- ここから追加 ---
-	authGroup := r.Group("/auth")
-	authGroup.Use(middleware.AuthMiddleware()) // 関所を設置
-	{
-		// 認証チェック用のシンプルなエンドポイント
-		authGroup.GET("/me", func(c *gin.Context) {
-			userID, _ := c.Get("userID")
-			c.JSON(200, gin.H{
-				"user_id": userID,
-				"message": "認証に成功しています！",
-			})
-		})
-
-		// シューズ管理
-		authGroup.POST("/shoes", handler.CreateShoe)
-		authGroup.GET("/shoes", handler.ListShoes)
-		authGroup.DELETE("/shoes/:id", handler.DeleteShoe)
-
-		// 走行ログ管理
-		authGroup.POST("/training-logs", handler.CreateTrainingLog)
-		authGroup.GET("/training-logs", handler.ListTrainingLogs)
-		authGroup.GET("/training-logs/formatted", handler.ListTrainingLogsFormatted)
-		authGroup.POST("/training-logs/stream", handler.ImportTrainingLogsStream)
-
-		// 解析（月別レポート・Goroutine並列集計）
-		authGroup.GET("/analysis", handler.MonthlyReport)
+	// Air がビルド失敗のまま古い tmp/main を動かすと /api/v1 が 404 のままになる。起動ログで確認できるようにする。
+	if gin.IsDebugging() {
+		for _, ri := range r.Routes() {
+			if strings.Contains(ri.Path, "/api/v1/") && (strings.Contains(ri.Path, "signup") || strings.Contains(ri.Path, "health")) {
+				log.Printf("route %s %s", ri.Method, ri.Path)
+			}
+		}
 	}
-	// --- ここまで ---
 
 	r.Run(":8080")
 }

@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	"github.com/KENTA0326/run-sync-pro/internal/apperrors"
 	"github.com/KENTA0326/run-sync-pro/service"
 	"github.com/gin-gonic/gin"
 )
@@ -18,11 +19,12 @@ type FullMarathonSplitsResponse struct {
 	Rows       []service.SplitRow `json:"rows"`
 }
 
-// FullMarathonSplits は「フルマラソン(42.195km)の1kmごとの通過タイム」を返す（10km単位ページング）
-func FullMarathonSplits(c *gin.Context) {
+// FullMarathonSplits は「フルマラソン(42.195km)の1kmごとの通過タイム」を返す（10km単位ページング）。
+// POST /api/v1/splits/full-marathon （レガシー: POST /splits/fullmarathon）
+func (h *Handlers) FullMarathonSplits(c *gin.Context) {
 	var input FullMarathonSplitsInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "pace_sec_per_km を正しく指定してください"})
+		respondHTTPError(c, apperrors.BadRequest("pace_sec_per_km を正しく指定してください", err))
 		return
 	}
 	page := input.Page
@@ -30,9 +32,9 @@ func FullMarathonSplits(c *gin.Context) {
 		page = 1
 	}
 
-	all := service.GenerateFullMarathonSplits(input.PaceSecPerKm)
+	all := h.splits.GenerateFullMarathonSplits(input.PaceSecPerKm)
 	if len(all) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "スプリットを生成できません"})
+		respondHTTPError(c, apperrors.BadRequest("スプリットを生成できません"))
 		return
 	}
 

@@ -29,6 +29,12 @@ docker compose up -d
 - 仕様ファイル: [docs/openapi.yaml](docs/openapi.yaml)
 - 見方: [docs/openapi.md](docs/openapi.md)（Swagger UI の起動方法など）
 
+## プライベートモジュールと SemVer 運用
+
+- 手順: [docs/private-module-semver.md](docs/private-module-semver.md)
+- SemVer チェック: `make semver-check`
+- タグ作成: `make release-tag`
+
 ## Go（フォーマッター/リンター）
 
 - **フォーマット**: `gofmt`

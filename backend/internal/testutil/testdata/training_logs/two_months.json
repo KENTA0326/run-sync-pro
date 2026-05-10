@@ -1,0 +1,12 @@
+[
+  {
+    "training_date": "2026-03-15T12:00:00+09:00",
+    "distance": 10,
+    "duration": 3600
+  },
+  {
+    "training_date": "2026-04-10T12:00:00+09:00",
+    "distance": 5,
+    "duration": 1800
+  }
+]
