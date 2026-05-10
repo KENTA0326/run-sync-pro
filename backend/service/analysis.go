@@ -211,15 +211,7 @@ func AnalyzeByMonth(logs []model.TrainingLog) AnalysisResponse {
 	var totalDur int
 	var totalCount int
 	for i, r := range results {
-		reports[i] = MonthlyReport{
-			YearMonth:       r.YearMonth,
-			TotalDistance:   r.TotalDistance,
-			TotalDuration:   r.TotalDuration,
-			RunCount:        r.RunCount,
-			AvgPaceSecPerKm: r.AvgPaceSecPerKm,
-			AvgVDOT:         r.AvgVDOT,
-			MaxVDOT:         r.MaxVDOT,
-		}
+		reports[i] = MonthlyReport(r)
 		totalDist += r.TotalDistance
 		totalDur += r.TotalDuration
 		totalCount += r.RunCount

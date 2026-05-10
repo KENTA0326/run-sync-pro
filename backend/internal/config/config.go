@@ -13,7 +13,7 @@ func ResolveString(cliValue string, envKey string, defaultValue string) string {
 	}
 	v := viper.New()
 	v.SetDefault(envKey, defaultValue)
-	v.BindEnv(envKey)
+	_ = v.BindEnv(envKey)
 	v.AutomaticEnv()
 	return v.GetString(envKey)
 }

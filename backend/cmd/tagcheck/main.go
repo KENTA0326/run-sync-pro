@@ -91,14 +91,10 @@ func checkFile(path string) []string {
 			}
 			tag := reflect.StructTag(strings.Trim(field.Tag.Value, "`"))
 			if b := tag.Get("binding"); b != "" {
-				for _, msg := range checkBinding(fset, field.Pos(), path, b) {
-					out = append(out, msg)
-				}
+				out = append(out, checkBinding(fset, field.Pos(), path, b)...)
 			}
 			if g := tag.Get("gorm"); g != "" {
-				for _, msg := range checkGorm(fset, field.Pos(), path, g) {
-					out = append(out, msg)
-				}
+				out = append(out, checkGorm(fset, field.Pos(), path, g)...)
 			}
 		}
 		return true
