@@ -42,6 +42,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiPath } from '~/composables/apiPaths'
 import type { SignUpRequest, SignUpResponse } from '~/types/api'
 
 definePageMeta({
@@ -64,7 +65,7 @@ const handleSignUp = async () => {
       email: email.value,
       password: password.value,
     }
-    await api.post<SignUpResponse>('/signup', body)
+    await api.post<SignUpResponse>(apiPath.authSignup, body)
     success.value = '登録が完了しました。ログインしてください。'
     name.value = ''
     email.value = ''

@@ -21,6 +21,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiPath } from '~/composables/apiPaths'
 import type { LoginRequest, LoginResponse } from '~/types/api'
 
 definePageMeta({
@@ -40,7 +41,7 @@ const handleLogin = async () => {
       email: email.value,
       password: password.value,
     }
-    const data = await api.post<LoginResponse>('/login', body)
+    const data = await api.post<LoginResponse>(apiPath.authLogin, body)
 
     auth.setToken(data.token)
     alert('ログイン成功！')

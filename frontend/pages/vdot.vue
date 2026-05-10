@@ -279,6 +279,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiPath } from '~/composables/apiPaths'
 import type {
   FullMarathonSplitsRequest,
   FullMarathonSplitsResponse,
@@ -350,7 +351,7 @@ async function fetchFullSplits(page: number) {
       pace_sec_per_km: result.value.paces.marathon_sec_per_km,
       page,
     }
-    const data = await api.post<FullMarathonSplitsResponse>('/splits/fullmarathon', body)
+    const data = await api.post<FullMarathonSplitsResponse>(apiPath.splitsFullMarathon, body)
     splits.value = data
   } catch (err) {
     splitsError.value = api.getErrorMessage(err)
@@ -382,7 +383,7 @@ async function calculate() {
       time_seconds: timeSeconds,
       riegel_exponent: riegelExponent.value,
     }
-    const data = await api.post<VDOTCalculateResponse>('/vdot/calculate', body)
+    const data = await api.post<VDOTCalculateResponse>(apiPath.vdotCalculate, body)
     result.value = data
   } catch (err) {
     error.value = api.getErrorMessage(err)

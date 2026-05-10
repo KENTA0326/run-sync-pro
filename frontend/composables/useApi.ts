@@ -6,10 +6,17 @@
  */
 import type { ApiErrorBody } from '~/types/api'
 
+function resolveApiBase(raw: unknown): string {
+  const s = typeof raw === 'string' ? raw.trim() : ''
+  // 空だと `/api/v1/...` が「今のページのオリジン」向きになり、Nuxt が 404 を返す。
+  if (s) return s.replace(/\/+$/, '')
+  return 'http://localhost:8080'
+}
+
 export function useApi() {
   const config = useRuntimeConfig()
   const auth = useAuthStore()
-  const baseURL = config.public.apiBase as string
+  const baseURL = resolveApiBase(config.public.apiBase)
 
   type RequestOptions = {
     method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'

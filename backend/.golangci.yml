@@ -1,0 +1,32 @@
+run:
+  timeout: 3m
+  tests: true
+  issues-exit-code: 1
+
+output:
+  sort-results: true
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  # run.skip-dirs は新スキーマで非推奨。代わりに issues.exclude-dirs を使う。
+  exclude-dirs:
+    - tmp
+    - vendor
+
+linters-settings:
+  govet:
+    enable-all: false
+    disable:
+      - fieldalignment

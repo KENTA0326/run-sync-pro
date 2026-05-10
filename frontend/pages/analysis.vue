@@ -121,6 +121,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiPath } from '~/composables/apiPaths'
 import type { AnalysisResponse } from '~/types/api'
 
 definePageMeta({
@@ -169,7 +170,7 @@ async function fetchAnalysis() {
   loading.value = true
   error.value = ''
   try {
-    const data = await api.get<AnalysisResponse>('/auth/analysis')
+    const data = await api.get<AnalysisResponse>(apiPath.analysisMonthly)
     analysis.value = data
   } catch (err) {
     error.value = api.getErrorMessage(err)

@@ -94,3 +94,13 @@ func fmtFloat(v float64) string {
 	return fmtInt(iv) + "." + s
 }
 
+type marathonSplitsStd struct{}
+
+// NewMarathonSplits は本番用のスプリット生成の具体実装を返す。
+func NewMarathonSplits() *marathonSplitsStd {
+	return &marathonSplitsStd{}
+}
+
+func (marathonSplitsStd) GenerateFullMarathonSplits(paceSecPerKm float64) []SplitRow {
+	return GenerateFullMarathonSplits(paceSecPerKm)
+}

@@ -86,6 +86,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiPath } from '~/composables/apiPaths'
 import type { CreateShoeRequest, Shoe } from '~/types/api'
 
 definePageMeta({
@@ -111,7 +112,7 @@ async function fetchShoes() {
   loading.value = true
   error.value = ''
   try {
-    const data = await api.get<Shoe[]>('/auth/shoes')
+    const data = await api.get<Shoe[]>(apiPath.shoes)
     shoes.value = data
   } catch (err) {
     error.value = api.getErrorMessage(err)
@@ -133,7 +134,7 @@ async function handleCreate() {
       model: model.value,
       purchase_date: purchaseDate.value,
     }
-    await api.post<Shoe>('/auth/shoes', body)
+    await api.post<Shoe>(apiPath.shoes, body)
     success.value = 'シューズを登録しました。'
     brand.value = ''
     model.value = ''
@@ -149,7 +150,7 @@ async function handleDelete(id: number) {
   error.value = ''
   success.value = ''
   try {
-    await api.delete<unknown>(`/auth/shoes/${id}`)
+    await api.delete<unknown>(apiPath.shoe(id))
     success.value = 'シューズを削除しました。'
     await fetchShoes()
   } catch (err) {

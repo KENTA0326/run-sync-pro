@@ -1,5 +1,8 @@
-### ユーザー登録のテスト
-POST http://localhost:8080/signup
+### API が 8080 に届いているか（404 の切り分け用）
+GET http://localhost:8080/api/v1/health
+
+### ユーザー登録（現行 API）
+POST http://localhost:8080/api/v1/auth/signup
 Content-Type: application/json
 
 {
@@ -8,8 +11,11 @@ Content-Type: application/json
   "password": "password123"
 }
 
-### ログインのテスト
-POST http://localhost:8080/login
+### レガシー別名（同じハンドラ）
+# POST http://localhost:8080/signup
+
+### ログイン（現行 API）
+POST http://localhost:8080/api/v1/auth/login
 Content-Type: application/json
 
 {
@@ -17,6 +23,6 @@ Content-Type: application/json
   "password": "password123"
 }
 
-### 認証が必要なページのテスト
-GET http://localhost:8080/auth/me
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzMwOTg2NzYsInVzZXJfaWQiOjF9.jsPHE4y9mPYVR6K6Ky3JbDUS5f--TTq4yZYAjHDlkZg
+### 認証が必要（現行: /api/v1/users/me、レガシー: /auth/me）
+GET http://localhost:8080/api/v1/users/me
+Authorization: Bearer <login で返った token を貼る>
