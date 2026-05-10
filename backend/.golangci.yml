@@ -2,9 +2,6 @@ run:
   timeout: 3m
   tests: true
   issues-exit-code: 1
-  skip-dirs:
-    - tmp
-    - vendor
 
 output:
   sort-results: true
@@ -23,6 +20,10 @@ linters:
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
+  # run.skip-dirs は新スキーマで非推奨。代わりに issues.exclude-dirs を使う。
+  exclude-dirs:
+    - tmp
+    - vendor
 
 linters-settings:
   govet:
