@@ -1,3 +1,7 @@
+-- 本番向け: ロック・実行時間の上限（トランザクション内）
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '60s';
+
 -- ユーザーテーブル
 CREATE TABLE IF NOT EXISTS users (
     id BIGSERIAL PRIMARY KEY,

@@ -15,6 +15,16 @@ docker compose up -d
 - フロントエンド: http://localhost:3001
 - DB: localhost:5432（POSTGRES_* は .env を参照）
 
+## ビルド設定
+
+Docker / Go / Nuxt / CI の設定は [docs/build-configuration.md](docs/build-configuration.md) にまとめています。
+
+- ビルド設定の基本項目と設定ファイルの編集
+- エントリーポイント（`main.go` / `app.vue`）と出力先（`tmp/main` / `.output/`）
+- 環境変数の注入（`.env` → Compose → アプリ）
+- 本番ビルドの最適化（Go ldflags、Nuxt/Vite minify）
+- 開発時のホットリロード（Air）と HMR（Nuxt dev）
+
 ## 環境変数の外部化
 
 接続先やパスワードは `.env` で管理しています（`.env` は Git に含めません）。

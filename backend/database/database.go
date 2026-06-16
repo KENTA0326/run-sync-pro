@@ -2,8 +2,9 @@ package database
 
 import (
 	"embed"
-	"fmt"
-	"log"
+	"errors"
+	"log/slog"
+	"os"
 
 	"github.com/KENTA0326/run-sync-pro/internal/config"
 	"github.com/golang-migrate/migrate/v4"
@@ -34,29 +35,37 @@ func Connect() {
 	// 1. バージョン管理されたマイグレーションを実行
 	source, err := iofs.New(migrationsFS, "migrations")
 	if err != nil {
-		log.Fatal("Failed to open migrations source:", err)
+		slog.Error("migrations_source_failed", slog.Any("err", err))
+		os.Exit(1)
 	}
 
 	m, err := migrate.NewWithSourceInstance("iofs", source, postgresURL)
 	if err != nil {
-		log.Fatal("Failed to create migrate instance:", err)
+		slog.Error("migrations_instance_failed", slog.Any("err", err))
+		os.Exit(1)
 	}
 	defer m.Close()
 
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		log.Fatal("Failed to run migrations:", err)
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		slog.Error("migrations_up_failed", slog.Any("err", err))
+		os.Exit(1)
 	}
 	if err == nil {
-		fmt.Println("Migrations applied successfully.")
+		slog.Info("migrations_applied")
+	} else {
+		slog.Info("migrations_no_change")
 	}
 
 	// 2. GORM で DB 接続（アプリ用）
 	dsn := getDSN()
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		slog.Error("database_connect_failed", slog.Any("err", err))
+		os.Exit(1)
 	}
 
-	fmt.Println("Database connection successful!")
+	RegisterCallbacks(db)
+
+	slog.Info("database_connected")
 	DB = db
 }

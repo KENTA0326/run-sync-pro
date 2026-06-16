@@ -2,6 +2,8 @@ package service
 
 import (
 	"math"
+
+	"github.com/KENTA0326/run-sync-pro/model"
 )
 
 // VDOT計算式（Jack Daniels' Running Formula に基づく）
@@ -34,16 +36,6 @@ func CalculateVDOT(distanceMeters, timeSeconds float64) float64 {
 		return 0
 	}
 	return math.Round(vdot*10) / 10
-}
-
-// TrainingPaces はVDOTに基づく各強度の推奨ペース（1kmあたりの秒数）
-type TrainingPaces struct {
-	EasyMinSecPerKm    float64 `json:"easy_min_sec_per_km"`   // ジョグ（下限）
-	EasyMaxSecPerKm    float64 `json:"easy_max_sec_per_km"`   // ジョグ（上限）
-	MarathonSecPerKm   float64 `json:"marathon_sec_per_km"`   // マラソンペース
-	ThresholdSecPerKm  float64 `json:"threshold_sec_per_km"`  // 閾値走
-	IntervalSecPerKm   float64 `json:"interval_sec_per_km"`   // インターバル
-	RepetitionSecPerKm float64 `json:"repetition_sec_per_km"` // レペティション
 }
 
 // velocityFromVDOT は VDOT と持続時間T(分)・強度係数(0-1)から速度(m/min)を逆算する
@@ -79,7 +71,7 @@ func velocityToSecPerKm(velocityMperMin float64) float64 {
 
 // CalculateTrainingPaces はVDOT値から各強度の推奨ペース(秒/km)を算出する
 // Jack Daniels の強度目安: E 約72%, M 約82%, T 約90%, I 約97.5%, R 約102%
-func CalculateTrainingPaces(vdot float64) TrainingPaces {
+func CalculateTrainingPaces(vdot float64) model.TrainingPaces {
 	// 持続時間の目安(分): Easy長め, M 180, T 20, I 5, R 2
 	const (
 		tEasy = 60
@@ -104,7 +96,7 @@ func CalculateTrainingPaces(vdot float64) TrainingPaces {
 	secEMax := velocityToSecPerKm(vEHigh) // ゆっくり = 秒数大
 	secEMin := velocityToSecPerKm(vELow)  // 速い = 秒数小
 
-	return TrainingPaces{
+	return model.TrainingPaces{
 		EasyMinSecPerKm:    math.Round(secEMin*10) / 10,
 		EasyMaxSecPerKm:    math.Round(secEMax*10) / 10,
 		MarathonSecPerKm:   math.Round(secM*10) / 10,
@@ -112,14 +104,6 @@ func CalculateTrainingPaces(vdot float64) TrainingPaces {
 		IntervalSecPerKm:   math.Round(secI*10) / 10,
 		RepetitionSecPerKm: math.Round(secR*10) / 10,
 	}
-}
-
-// RacePredictions はVDOTから推定した各距離のタイム（秒）
-type RacePredictions struct {
-	FullSeconds  int `json:"full_seconds"`
-	HalfSeconds  int `json:"half_seconds"`
-	TenKSeconds  int `json:"ten_k_seconds"`
-	FiveKSeconds int `json:"five_k_seconds"`
 }
 
 // PredictRiegelSeconds はリーゲル公式で距離換算したタイム（秒）を返す
@@ -143,8 +127,8 @@ func PredictRiegelSeconds(timeSeconds float64, baseDistanceMeters float64, targe
 }
 
 // CalculateRiegelPredictions は入力(距離・タイム)を起点に、リーゲル公式で主要距離の予想タイムを返す
-func CalculateRiegelPredictions(distanceMeters float64, timeSeconds float64, exponent float64) RacePredictions {
-	return RacePredictions{
+func CalculateRiegelPredictions(distanceMeters float64, timeSeconds float64, exponent float64) model.RacePredictions {
+	return model.RacePredictions{
 		FullSeconds:  PredictRiegelSeconds(timeSeconds, distanceMeters, 42195, exponent),
 		HalfSeconds:  PredictRiegelSeconds(timeSeconds, distanceMeters, 21097.5, exponent),
 		TenKSeconds:  PredictRiegelSeconds(timeSeconds, distanceMeters, 10000, exponent),
@@ -212,8 +196,8 @@ func PredictRaceTimeSeconds(vdot float64, distanceMeters float64) int {
 }
 
 // CalculateRacePredictions は主要距離の予想タイムをまとめて返す
-func CalculateRacePredictions(vdot float64) RacePredictions {
-	return RacePredictions{
+func CalculateRacePredictions(vdot float64) model.RacePredictions {
+	return model.RacePredictions{
 		FullSeconds:  PredictRaceTimeSeconds(vdot, 42195),
 		HalfSeconds:  PredictRaceTimeSeconds(vdot, 21097.5),
 		TenKSeconds:  PredictRaceTimeSeconds(vdot, 10000),
@@ -232,10 +216,10 @@ func (vdotStd) CalculateVDOT(distanceMeters, timeSeconds float64) float64 {
 	return CalculateVDOT(distanceMeters, timeSeconds)
 }
 
-func (vdotStd) CalculateTrainingPaces(vdot float64) TrainingPaces {
+func (vdotStd) CalculateTrainingPaces(vdot float64) model.TrainingPaces {
 	return CalculateTrainingPaces(vdot)
 }
 
-func (vdotStd) CalculateRiegelPredictions(distanceMeters, timeSeconds, exponent float64) RacePredictions {
+func (vdotStd) CalculateRiegelPredictions(distanceMeters, timeSeconds, exponent float64) model.RacePredictions {
 	return CalculateRiegelPredictions(distanceMeters, timeSeconds, exponent)
 }

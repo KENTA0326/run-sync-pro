@@ -5,8 +5,10 @@ import (
 	"net/http"
 
 	"github.com/KENTA0326/run-sync-pro/internal/apperrors"
+	"github.com/KENTA0326/run-sync-pro/internal/domain"
 	"github.com/KENTA0326/run-sync-pro/model"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // SignUp はユーザー新規登録。
@@ -34,7 +36,7 @@ func (h *Handlers) SignUp(c *gin.Context) {
 	}
 
 	var dupCount int64
-	if err := h.db.Model(&model.User{}).Where("email = ?", email.String()).Count(&dupCount).Error; err != nil {
+	if err := h.dbCtx(c).Model(&model.User{}).Where("email = ?", email.String()).Count(&dupCount).Error; err != nil {
 		respondHTTPError(c, apperrors.InternalMsg("ユーザー登録処理に失敗しました", apperrors.Annotate("count user by email", err)))
 		return
 	}
@@ -55,8 +57,28 @@ func (h *Handlers) SignUp(c *gin.Context) {
 		Password: hashedPassword,
 	}
 
-	if err := h.db.Create(&user).Error; err != nil {
-		respondHTTPError(c, apperrors.InternalMsg("ユーザー作成に失敗しました", apperrors.Annotate("db create user", err)))
+	if err := h.dbCtx(c).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&user).Error; err != nil {
+			return apperrors.Annotate("db create user", err)
+		}
+
+		var roleID uint
+		if err := tx.Table("roles").Select("id").Where("name = ?", "viewer").Scan(&roleID).Error; err != nil {
+			return apperrors.Annotate("db find viewer role", err)
+		}
+		if roleID == 0 {
+			return apperrors.InternalMsg("ロール設定に失敗しました", apperrors.Annotate("viewer role missing", gorm.ErrRecordNotFound))
+		}
+
+		if err := tx.Table("user_roles").Create(map[string]any{
+			"user_id": user.ID,
+			"role_id": roleID,
+		}).Error; err != nil {
+			return apperrors.Annotate("db bind user role", err)
+		}
+		return nil
+	}); err != nil {
+		respondPreferVisible(c, err, "ユーザー作成に失敗しました")
 		return
 	}
 
@@ -87,7 +109,7 @@ func (h *Handlers) Login(c *gin.Context) {
 	}
 
 	var user model.User
-	if err := h.db.Where("email = ?", email.String()).First(&user).Error; err != nil {
+	if err := h.dbCtx(c).Where("email = ?", email.String()).First(&user).Error; err != nil {
 		mapped := apperrors.FromGORM(err)
 		if errors.Is(mapped, apperrors.ErrNotFound) {
 			respondHTTPError(c, apperrors.UnauthorizedMsg("メールアドレスまたはパスワードが正しくありません"))
@@ -114,9 +136,13 @@ func (h *Handlers) Login(c *gin.Context) {
 // CurrentUser は JWT からユーザー ID を返す（認証確認・デバッグ用）。
 // ルート: GET /api/v1/users/me （レガシー: GET /auth/me）。
 func (h *Handlers) CurrentUser(c *gin.Context) {
-	userID, _ := c.Get("userID")
+	userID, ok := domain.UserIDFromRequest(c.Request)
+	if !ok {
+		respondHTTPError(c, apperrors.UnauthorizedMsg("ユーザー情報を取得できません"))
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"user_id": userID,
+		"user_id": userID.Uint(),
 		"message": "認証に成功しています！",
 	})
 }

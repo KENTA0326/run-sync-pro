@@ -3,8 +3,11 @@ info:
   title: Run Sync Pro API
   description: |
     ランニング記録・シューズ管理・VDOT計算・スプリット計算を行う API です。
+    - **新規クライアント**: `/api/v1/...` を利用（[be-api-extensions.md](./be-api-extensions.md) 参照）
+    - リソース個体は `/shoes/:id` のようにパスパラメータで特定
     - 認証不要: サインアップ・ログイン・VDOT計算・スプリット計算
     - 認証必要（Bearer JWT）: シューズ・走行ログ・月別解析
+    - レガシー別名（`/signup`, `/auth/...`）は後方互換のため残存
   version: 1.0.0
 
 servers:
@@ -26,6 +29,10 @@ tags:
     description: 走行ログ CRUD（認証必要）
   - name: 解析
     description: 月別レポート（認証必要）
+  - name: API v1
+    description: 現行バージョン付き REST（新規クライアント向け）
+  - name: 拡張 API
+    description: GraphQL / WebSocket / gRPC（学習用サンプル）
 
 paths:
   /signup:
@@ -158,18 +165,20 @@ paths:
   /auth/shoes:
     get:
       tags: [シューズ]
-      summary: シューズ一覧
+      summary: シューズ一覧（レガシー）
+      description: 新規は `GET /api/v1/shoes` を利用
       security:
         - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationLimit'
+        - $ref: '#/components/parameters/PaginationOffset'
       responses:
         '200':
           description: アクティブなシューズ一覧（購入日・ID の新しい順）
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Shoe'
+                $ref: '#/components/schemas/ListShoesResponse'
         '401':
           description: 未認証
     post:
@@ -191,7 +200,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Shoe'
         '400':
-          description: バリデーションエラー（例: purchase_date が YYYY-MM-DD でない）
+          description: "バリデーションエラー（例: purchase_date が YYYY-MM-DD でない）"
           content:
             application/json:
               schema:
@@ -237,18 +246,20 @@ paths:
   /auth/training-logs:
     get:
       tags: [走行ログ]
-      summary: 走行ログ一覧
+      summary: 走行ログ一覧（レガシー）
+      description: 新規は `GET /api/v1/training-logs` を利用
       security:
         - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationLimit'
+        - $ref: '#/components/parameters/PaginationOffset'
       responses:
         '200':
           description: 走行ログ一覧（日付・ID の新しい順、シューズ情報付き）
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/TrainingLog'
+                $ref: '#/components/schemas/PaginatedTrainingLogsResponse'
         '401':
           description: 未認証
     post:
@@ -296,6 +307,371 @@ paths:
         '401':
           description: 未認証
 
+  /api/v1/health:
+    get:
+      tags: [API v1]
+      summary: ヘルスチェック
+      responses:
+        '200':
+          description: 稼働中
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /api/v1/auth/signup:
+    post:
+      tags: [API v1, 認証]
+      summary: ユーザー登録
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignUpRequest'
+      responses:
+        '200':
+          description: 登録完了
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/auth/login:
+    post:
+      tags: [API v1, 認証]
+      summary: ログイン
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: ログイン成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/vdot/calculate:
+    post:
+      tags: [API v1, VDOT]
+      summary: VDOT 計算
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VDOTCalculateRequest'
+      responses:
+        '200':
+          description: 計算結果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VDOTCalculateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/splits/full-marathon:
+    post:
+      tags: [API v1, スプリット]
+      summary: フルマラソンスプリット
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FullMarathonSplitsRequest'
+      responses:
+        '200':
+          description: スプリット一覧
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FullMarathonSplitsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/analysis/monthly:
+    get:
+      tags: [API v1, 解析]
+      summary: 月別走行レポート
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 月別レポート＋全体合計
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/shoes/{id}:
+    get:
+      tags: [API v1, シューズ]
+      summary: シューズ1件取得
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: シューズ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Shoe'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [API v1, シューズ]
+      summary: シューズ削除（論理削除）
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: 削除完了
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/training-logs/{id}:
+    get:
+      tags: [API v1, 走行ログ]
+      summary: 走行ログ1件取得
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: 走行ログ（シューズ情報付き）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingLog'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/shoes:
+    get:
+      tags: [API v1, シューズ]
+      summary: シューズ一覧
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationLimit'
+        - $ref: '#/components/parameters/PaginationOffset'
+      responses:
+        '200':
+          description: ページネーション付き一覧
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListShoesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [API v1, シューズ]
+      summary: シューズ登録
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateShoeRequest'
+      responses:
+        '200':
+          description: 登録したシューズ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Shoe'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/training-logs:
+    get:
+      tags: [API v1, 走行ログ]
+      summary: 走行ログ一覧 / CSV エクスポート
+      description: |
+        既定は JSON 一覧。`Accept: text/csv` で CSV ストリーム（レガシー `GET /auth/training-logs/export/csv` と同等）。
+        `view=formatted` で日付等を整形した表現に切替（レガシー `/training-logs/formatted` と同等）。
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaginationLimit'
+        - $ref: '#/components/parameters/PaginationOffset'
+        - $ref: '#/components/parameters/TrainingLogsView'
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+            example: text/csv
+          description: "`text/csv` 指定時は CSV ファイルを返す（ページネーションは無視）"
+      responses:
+        '200':
+          description: JSON 一覧または CSV
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTrainingLogsResponse'
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [API v1, 走行ログ]
+      summary: 走行ログ登録 / CSV・JSON 一括取込
+      description: |
+        単件: `application/json` オブジェクト。
+        CSV: `multipart/form-data` の `file` または `Content-Type: text/csv` の本文。
+        一括: `application/json` でトップレベル配列 `[{...}, ...]`（レガシー `POST /auth/training-logs/stream` と同等）。
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/CreateTrainingLogRequest'
+                - type: array
+                  items:
+                    $ref: '#/components/schemas/CreateTrainingLogRequest'
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+          text/csv:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: 保存または取込完了
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/MessageResponse'
+                  - type: object
+                    required: [message, created_count]
+                    properties:
+                      message:
+                        type: string
+                      created_count:
+                        type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/graphql:
+    post:
+      tags: [拡張 API]
+      summary: GraphQL エンドポイント
+      description: 'JWT 必須。Body `{ "query": "...", "variables": {} }`'
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                variables:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: GraphQL 結果（errors 配列がある場合も 200）
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/ws/training-logs:
+    get:
+      tags: [拡張 API]
+      summary: 走行ログ WebSocket
+      description: |
+        JWT 必須（Upgrade）。メッセージ `{ "type": "ping" }` → `{ "type": "pong" }`。
+        CSV 取込完了時 `{ "type": "training_logs_imported", "created_count": N }`
+      security:
+        - BearerAuth: []
+      responses:
+        '101':
+          description: Switching Protocols
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
 components:
   securitySchemes:
     BearerAuth:
@@ -304,14 +680,108 @@ components:
       bearerFormat: JWT
       description: ログインで取得した token をそのまま指定
 
+  parameters:
+    PaginationLimit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 50
+      description: 1ページ件数（最大 500）
+    PaginationOffset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      description: 先頭からの件数
+    TrainingLogsView:
+      name: view
+      in: query
+      schema:
+        type: string
+        enum: [formatted]
+      description: formatted 指定時は日付・タイムスタンプを整形した JSON（別 URL 不要）
+
+  responses:
+    BadRequest:
+      description: バリデーションエラー
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: 未認証
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: 権限不足
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: リソースが見つからない
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
   schemas:
     ErrorResponse:
       type: object
       required: [error]
       properties:
         error:
-          type: string
-          description: エラーメッセージ（日本語）
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: INVALID_INPUT
+            message:
+              type: string
+              description: エラーメッセージ（日本語）
+
+    PaginationMeta:
+      type: object
+      properties:
+        limit:
+          type: integer
+        offset:
+          type: integer
+        total:
+          type: integer
+          format: int64
+
+    ListShoesResponse:
+      type: object
+      properties:
+        shoes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Shoe'
+        brands:
+          type: array
+          items:
+            type: string
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PaginatedTrainingLogsResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrainingLog'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
 
     MessageResponse:
       type: object
@@ -348,7 +818,7 @@ components:
       properties:
         token:
           type: string
-          description: JWT（Authorization: Bearer に設定して利用）
+          description: "JWT（Authorization: Bearer に設定して利用）"
 
     VDOTCalculateRequest:
       type: object

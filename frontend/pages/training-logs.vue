@@ -106,7 +106,50 @@
     </div>
 
     <div class="rounded-lg bg-white p-6 shadow-md">
-      <h2 class="mb-3 text-lg font-bold text-gray-800">走行ログ一覧</h2>
+      <h2 class="mb-4 text-lg font-bold text-gray-800">CSV 一括取込</h2>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <input
+          ref="csvFileInput"
+          type="file"
+          accept=".csv,text/csv"
+          class="block max-w-full text-sm text-gray-700 file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-800 hover:file:bg-gray-200"
+          @change="onCsvFileChange"
+        />
+        <button
+          type="button"
+          class="rounded bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="csvImporting || !csvFile"
+          @click="handleCsvImport"
+        >
+          {{ csvImporting ? '取込中...' : 'CSV を取り込む' }}
+        </button>
+        <button
+          type="button"
+          class="rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          @click="downloadCsvTemplate"
+        >
+          テンプレートをダウンロード
+        </button>
+      </div>
+
+      <p v-if="csvError" class="mt-3 text-sm text-red-600">{{ csvError }}</p>
+      <p v-if="csvSuccess" class="mt-3 text-sm text-green-600">{{ csvSuccess }}</p>
+    </div>
+
+    <div class="rounded-lg bg-white p-6 shadow-md">
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h2 class="text-lg font-bold text-gray-800">走行ログ一覧</h2>
+        <button
+          type="button"
+          class="rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="csvExporting || logsLoading"
+          @click="handleCsvExport"
+        >
+          {{ csvExporting ? 'ダウンロード中...' : 'CSV をダウンロード' }}
+        </button>
+      </div>
+      <p v-if="exportError" class="mb-2 text-sm text-red-600">{{ exportError }}</p>
       <p v-if="logsLoading" class="text-sm text-gray-600">読み込み中...</p>
       <p v-else-if="logs.length === 0" class="text-sm text-gray-600">まだ走行ログがありません。</p>
 
@@ -141,7 +184,14 @@
 
 <script setup lang="ts">
 import { apiPath } from '~/composables/apiPaths'
-import type { CreateTrainingLogRequest, Shoe, TrainingLog } from '~/types/api'
+import type {
+  CreateTrainingLogRequest,
+  ImportTrainingLogsResponse,
+  ListShoesResponse,
+  PaginatedTrainingLogsResponse,
+  Shoe,
+  TrainingLog,
+} from '~/types/api'
 
 definePageMeta({
   middleware: 'auth',
@@ -163,6 +213,17 @@ const logs = ref<TrainingLog[]>([])
 const logsLoading = ref(false)
 const error = ref('')
 const success = ref('')
+
+const csvFileInput = ref<HTMLInputElement | null>(null)
+const csvFile = ref<File | null>(null)
+const csvImporting = ref(false)
+const csvError = ref('')
+const csvSuccess = ref('')
+const csvExporting = ref(false)
+const exportError = ref('')
+
+const CSV_HEADER =
+  'training_date,distance,duration,pace,kind,shoe_id,memo'
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return '-'
@@ -195,8 +256,8 @@ function formatKind(k: number): string {
 
 async function fetchShoes() {
   try {
-    const data = await api.get<Shoe[]>(apiPath.shoes)
-    shoes.value = data
+    const data = await api.get<ListShoesResponse>(apiPath.shoes)
+    shoes.value = data.shoes
   } catch (err) {
     // エラーはフォーム上でまとめて表示するのでここでは握りつぶす
     console.error(err)
@@ -207,12 +268,77 @@ async function fetchLogs() {
   logsLoading.value = true
   error.value = ''
   try {
-    const data = await api.get<TrainingLog[]>(apiPath.trainingLogs)
-    logs.value = data
+    const data = await api.get<PaginatedTrainingLogsResponse>(apiPath.trainingLogs, { limit: 500 })
+    logs.value = data.items
   } catch (err) {
     error.value = api.getErrorMessage(err)
   } finally {
     logsLoading.value = false
+  }
+}
+
+function onCsvFileChange(event: Event) {
+  csvError.value = ''
+  csvSuccess.value = ''
+  const target = event.target as HTMLInputElement
+  csvFile.value = target.files?.[0] ?? null
+}
+
+function downloadCsvTemplate() {
+  const shoeID = shoes.value[0]?.id ?? 1
+  const today = new Date().toISOString().slice(0, 10)
+  const sample = `${CSV_HEADER}\n${today},10.0,3600,6:00,0,${shoeID},サンプル行\n`
+  const blob = new Blob([sample], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'training_logs_template.csv'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+async function handleCsvExport() {
+  exportError.value = ''
+  csvExporting.value = true
+  try {
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    await api.downloadGet(apiPath.trainingLogs, `training_logs_${today}.csv`, {
+      Accept: 'text/csv',
+    })
+  } catch (err) {
+    exportError.value = err instanceof Error ? err.message : api.getErrorMessage(err)
+  } finally {
+    csvExporting.value = false
+  }
+}
+
+async function handleCsvImport() {
+  csvError.value = ''
+  csvSuccess.value = ''
+  if (!csvFile.value) {
+    csvError.value = 'CSV ファイルを選択してください。'
+    return
+  }
+
+  csvImporting.value = true
+  try {
+    const form = new FormData()
+    form.append('file', csvFile.value, csvFile.value.name)
+    const res = await api.postFormData<ImportTrainingLogsResponse>(
+      apiPath.trainingLogs,
+      form
+    )
+    csvSuccess.value = `${res.message}（${res.created_count} 件）`
+    csvFile.value = null
+    if (csvFileInput.value) {
+      csvFileInput.value.value = ''
+    }
+    await fetchLogs()
+    await fetchShoes()
+  } catch (err) {
+    csvError.value = api.getErrorMessage(err)
+  } finally {
+    csvImporting.value = false
   }
 }
 

@@ -9,8 +9,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/KENTA0326/run-sync-pro/internal/apperrors"
 	"github.com/KENTA0326/run-sync-pro/database"
+	"github.com/KENTA0326/run-sync-pro/internal/apperrors"
+	"github.com/KENTA0326/run-sync-pro/internal/domain"
 	"github.com/KENTA0326/run-sync-pro/internal/timeutil"
 	"github.com/KENTA0326/run-sync-pro/model"
 	"github.com/gin-gonic/gin"
@@ -116,30 +117,12 @@ func toTrainingLogFormattedResponse(log model.TrainingLog) trainingLogFormattedR
 	}
 }
 
-// GET /api/v1/training-logs/formatted （レガシー: GET /auth/training-logs/formatted）
+// ListTrainingLogsFormatted はレガシー別名（GET /training-logs?view=formatted と同等）。
 func (h *Handlers) ListTrainingLogsFormatted(c *gin.Context) {
-	userID, ok := getUserIDFromContext(c)
-	if !ok {
-		respondHTTPError(c, apperrors.UnauthorizedMsg("ユーザー情報を取得できません"))
-		return
-	}
-
-	var logs []model.TrainingLog
-	if err := h.db.
-		Where("user_id = ?", userID).
-		Preload("Shoe").
-		Order("training_date DESC, id DESC").
-		Find(&logs).Error; err != nil {
-		respondHTTPError(c, apperrors.InternalMsg("走行ログの取得に失敗しました", apperrors.Annotate("db formatted logs", err)))
-		return
-	}
-
-	res := make([]trainingLogFormattedResponse, 0, len(logs))
-	for _, log := range logs {
-		res = append(res, toTrainingLogFormattedResponse(log))
-	}
-
-	c.JSON(http.StatusOK, res)
+	q := c.Request.URL.Query()
+	q.Set("view", "formatted")
+	c.Request.URL.RawQuery = q.Encode()
+	h.ListTrainingLogs(c)
 }
 
 type streamTrainingLogInput struct {
@@ -236,7 +219,7 @@ func validateStreamTrainingLogInput(in streamTrainingLogInput) error {
 func importStreamTrainingLogs(
 	ctx context.Context,
 	db *gorm.DB,
-	userID uint,
+	userID domain.UserID,
 	decoder *json.Decoder,
 	options TrainingLogImportOptions,
 ) (int, error) {
@@ -250,46 +233,18 @@ func importStreamTrainingLogs(
 		if err := decoder.Decode(&in); err != nil {
 			return count, apperrors.BadRequest("JSON 配列の要素を読み取れませんでした", err)
 		}
-		if err := validateStreamTrainingLogInput(in); err != nil {
+		if err := importOneTrainingLog(ctx, db, userID, in); err != nil {
 			return count, err
-		}
-
-		var shoe model.Shoe
-		if err := db.WithContext(ctx).
-			Where("id = ? AND user_id = ?", in.ShoeID, userID).
-			First(&shoe).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return count, apperrors.NotFoundMsg("指定した shoe_id のシューズが見つかりません", err)
-			}
-			return count, apperrors.Annotate("import stream first shoe", err)
-		}
-
-		log := model.TrainingLog{
-			UserID:       userID,
-			TrainingDate: in.TrainingDate.Time,
-			Distance:     in.Distance,
-			Duration:     in.Duration,
-			Pace:         in.Pace,
-			Memo:         in.Memo,
-			Kind:         in.Kind,
-			ShoeID:       in.ShoeID,
-		}
-		if err := db.WithContext(ctx).Create(&log).Error; err != nil {
-			return count, apperrors.Annotate("import stream insert log", err)
-		}
-		if err := db.WithContext(ctx).Model(&shoe).
-			Update("total_distance", gorm.Expr("total_distance + ?", in.Distance)).Error; err != nil {
-			return count, apperrors.Annotate("import stream update shoe km", err)
 		}
 		count++
 	}
 	return count, nil
 }
 
-// POST /api/v1/training-logs/import/stream （レガシー: POST /auth/training-logs/stream）
-// 形式: [{"training_date":"2026-04-22","distance":10.0,"duration":3600,"pace":"6:00","kind":0,"shoe_id":1}, ...]
-func (h *Handlers) ImportTrainingLogsStream(c *gin.Context) {
-	userID, ok := getUserIDFromContext(c)
+// handleImportTrainingLogsStream は POST /training-logs + JSON 配列本文用。
+// 形式: [{"training_date":"2026-04-22","distance":10.0,...}, ...]
+func (h *Handlers) handleImportTrainingLogsStream(c *gin.Context) {
+	userID, ok := domain.UserIDFromRequest(c.Request)
 	if !ok {
 		respondHTTPError(c, apperrors.UnauthorizedMsg("ユーザー情報を取得できません"))
 		return
@@ -324,13 +279,13 @@ func (h *Handlers) ImportTrainingLogsStream(c *gin.Context) {
 
 	createdCount := 0
 	if options.Atomic() {
-		err = database.WithTx(c.Request.Context(), h.db, func(tx *gorm.DB) error {
+		err = database.WithTx(c.Request.Context(), h.dbCtx(c), func(tx *gorm.DB) error {
 			var importErr error
 			createdCount, importErr = importStreamTrainingLogs(c.Request.Context(), tx, userID, decoder, options)
 			return importErr
 		})
 	} else {
-		createdCount, err = importStreamTrainingLogs(c.Request.Context(), h.db, userID, decoder, options)
+		createdCount, err = importStreamTrainingLogs(c.Request.Context(), h.dbCtx(c), userID, decoder, options)
 	}
 	if err != nil {
 		respondPreferVisible(c, err, "走行ログの一括取込に失敗しました")
@@ -358,8 +313,14 @@ func (h *Handlers) ImportTrainingLogsStream(c *gin.Context) {
 		return
 	}
 
+	h.invalidateMonthlyAnalysisCache(c, userID)
 	c.JSON(http.StatusOK, gin.H{
 		"message":       "走行ログを一括取り込みしました",
 		"created_count": createdCount,
 	})
+}
+
+// ImportTrainingLogsStream はレガシー別名（POST /training-logs + JSON 配列と同等）。
+func (h *Handlers) ImportTrainingLogsStream(c *gin.Context) {
+	h.handleImportTrainingLogsStream(c)
 }

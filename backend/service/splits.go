@@ -1,29 +1,24 @@
 package service
 
-import "math"
+import (
+	"math"
 
-type SplitRow struct {
-	// Km は通過距離（1kmごと。最後だけ 42.195km を Finish として返す）
-	Km float64 `json:"km"`
-	// Label は表示用ラベル（例: "1km", "Finish"）
-	Label string `json:"label"`
-	// CumulativeSeconds はスタートからの累積秒
-	CumulativeSeconds int `json:"cumulative_seconds"`
-}
+	"github.com/KENTA0326/run-sync-pro/model"
+)
 
 // GenerateFullMarathonSplits は 1km ごとの通過タイム + Finish(42.195km) を生成する
 // paceSecPerKm は 1km あたりの秒数
-func GenerateFullMarathonSplits(paceSecPerKm float64) []SplitRow {
+func GenerateFullMarathonSplits(paceSecPerKm float64) []model.SplitRow {
 	if paceSecPerKm <= 0 {
 		return nil
 	}
 
-	rows := make([]SplitRow, 0, 43)
+	rows := make([]model.SplitRow, 0, 43)
 
 	// 1km〜42km
 	for km := 1; km <= 42; km++ {
 		sec := int(math.Round(float64(km) * paceSecPerKm))
-		rows = append(rows, SplitRow{
+		rows = append(rows, model.SplitRow{
 			Km:                float64(km),
 			Label:             formatKmLabel(float64(km)),
 			CumulativeSeconds: sec,
@@ -33,7 +28,7 @@ func GenerateFullMarathonSplits(paceSecPerKm float64) []SplitRow {
 	// Finish: 42.195km
 	finishKm := 42.195
 	finishSec := int(math.Round(finishKm * paceSecPerKm))
-	rows = append(rows, SplitRow{
+	rows = append(rows, model.SplitRow{
 		Km:                finishKm,
 		Label:             "Finish",
 		CumulativeSeconds: finishSec,
@@ -101,6 +96,6 @@ func NewMarathonSplits() *marathonSplitsStd {
 	return &marathonSplitsStd{}
 }
 
-func (marathonSplitsStd) GenerateFullMarathonSplits(paceSecPerKm float64) []SplitRow {
+func (marathonSplitsStd) GenerateFullMarathonSplits(paceSecPerKm float64) []model.SplitRow {
 	return GenerateFullMarathonSplits(paceSecPerKm)
 }

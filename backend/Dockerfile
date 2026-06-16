@@ -11,11 +11,15 @@ WORKDIR /app
 ENV GOGC=50
 ENV GOMAXPROCS=1
 
-# ホストのファイルをコンテナにコピー
-COPY . .
-
-# airのバージョンを指定してインストール（最新の不整合を避けるため）
+# ソースに依存しないツール（コード変更時もキャッシュが効く）
 RUN go install github.com/air-verse/air@v1.61.7
+
+# go.mod / go.sum だけ先にコピーして依存をダウンロード
+COPY go.mod go.sum ./
+RUN go mod download
+
+# ソース本体は最後にコピー（変更のたびにここ以降が再実行される）
+COPY . .
 
 # コンテナ起動時に実行するコマンド
 CMD ["air", "-c", ".air.toml"]

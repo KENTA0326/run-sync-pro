@@ -13,8 +13,13 @@
         <p v-if="error" class="text-red-500 text-sm mt-2">{{ error }}</p>
       </div>
 
-      <p class="mt-4 text-center text-gray-600 text-sm">
-        <NuxtLink to="/signup" class="text-blue-600 hover:underline">新規登録はこちら</NuxtLink>
+      <p class="mt-4 text-center text-gray-600 text-sm space-y-1">
+        <span class="block">
+          <NuxtLink to="/forgot-password" class="text-blue-600 hover:underline">パスワードを忘れた方はこちら</NuxtLink>
+        </span>
+        <span class="block">
+          <NuxtLink to="/signup" class="text-blue-600 hover:underline">新規登録はこちら</NuxtLink>
+        </span>
       </p>
     </div>
   </div>
