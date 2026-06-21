@@ -66,6 +66,7 @@
             <option :value="1">LSD</option>
             <option :value="2">ペース走</option>
             <option :value="3">インターバル</option>
+            <option :value="4">レース</option>
           </select>
         </div>
         <div>
@@ -162,6 +163,7 @@
             <th class="p-2 text-right font-medium text-gray-700">ペース</th>
             <th class="p-2 text-left font-medium text-gray-700">種類</th>
             <th class="p-2 text-left font-medium text-gray-700">シューズ</th>
+            <th class="p-2 text-left font-medium text-gray-700">編集</th>
           </tr>
         </thead>
         <tbody>
@@ -170,10 +172,31 @@
             <td class="p-2 text-right font-mono">{{ log.distance.toFixed(1) }}</td>
             <td class="p-2 text-right font-mono">{{ formatDuration(log.duration) }}</td>
             <td class="p-2 text-right font-mono">{{ log.pace }}</td>
-            <td class="p-2 text-gray-700">{{ formatKind(log.kind) }}</td>
+            <td class="p-2 text-gray-700">
+              <select
+                v-model.number="editingKindByLogId[log.id]"
+                class="rounded border border-gray-300 p-1 text-sm text-gray-800"
+              >
+                <option :value="0">ジョグ</option>
+                <option :value="1">LSD</option>
+                <option :value="2">ペース走</option>
+                <option :value="3">インターバル</option>
+                <option :value="4">レース</option>
+              </select>
+            </td>
             <td class="p-2 text-gray-700">
               <span v-if="log.shoe">{{ log.shoe.brand }} {{ log.shoe.model }}</span>
               <span v-else>-</span>
+            </td>
+            <td class="p-2 text-gray-700">
+              <button
+                type="button"
+                class="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-50"
+                :disabled="updatingKindId === log.id || editingKindByLogId[log.id] === log.kind"
+                @click="handleUpdateKind(log)"
+              >
+                {{ updatingKindId === log.id ? '保存中...' : '保存' }}
+              </button>
             </td>
           </tr>
         </tbody>
@@ -191,6 +214,7 @@ import type {
   PaginatedTrainingLogsResponse,
   Shoe,
   TrainingLog,
+  UpdateTrainingLogKindRequest,
 } from '~/types/api'
 
 definePageMeta({
@@ -221,6 +245,8 @@ const csvError = ref('')
 const csvSuccess = ref('')
 const csvExporting = ref(false)
 const exportError = ref('')
+const editingKindByLogId = ref<Record<number, number>>({})
+const updatingKindId = ref<number | null>(null)
 
 const CSV_HEADER =
   'training_date,distance,duration,pace,kind,shoe_id,memo'
@@ -249,6 +275,8 @@ function formatKind(k: number): string {
       return 'ペース走'
     case 3:
       return 'インターバル'
+    case 4:
+      return 'レース'
     default:
       return 'その他'
   }
@@ -270,10 +298,38 @@ async function fetchLogs() {
   try {
     const data = await api.get<PaginatedTrainingLogsResponse>(apiPath.trainingLogs, { limit: 500 })
     logs.value = data.items
+    const map: Record<number, number> = {}
+    for (const item of data.items) {
+      map[item.id] = item.kind
+    }
+    editingKindByLogId.value = map
   } catch (err) {
     error.value = api.getErrorMessage(err)
   } finally {
     logsLoading.value = false
+  }
+}
+
+async function handleUpdateKind(log: TrainingLog) {
+  error.value = ''
+  success.value = ''
+  const newKind = editingKindByLogId.value[log.id]
+  if (newKind == null || newKind < 0 || newKind > 4) {
+    error.value = '種類(kind)は 0-4 の範囲で指定してください。'
+    return
+  }
+  if (newKind === log.kind) return
+
+  updatingKindId.value = log.id
+  try {
+    const body: UpdateTrainingLogKindRequest = { kind: newKind }
+    await api.patch<{ message: string }>(apiPath.trainingLogKind(log.id), body)
+    success.value = '走行ログの種類を更新しました。'
+    await fetchLogs()
+  } catch (err) {
+    error.value = api.getErrorMessage(err)
+  } finally {
+    updatingKindId.value = null
   }
 }
 

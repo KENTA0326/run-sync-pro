@@ -13,6 +13,7 @@ export const apiPath = {
   shoe: (id: number | string) => `/api/v1/shoes/${id}`,
   trainingLogs: '/api/v1/training-logs',
   trainingLog: (id: number | string) => `/api/v1/training-logs/${id}`,
+  trainingLogKind: (id: number | string) => `/api/v1/training-logs/${id}/kind`,
   analysisMonthly: '/api/v1/analysis/monthly',
   usersMe: '/api/v1/users/me',
   vdotCalculate: '/api/v1/vdot/calculate',

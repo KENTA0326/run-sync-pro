@@ -207,8 +207,8 @@ func validateStreamTrainingLogInput(in streamTrainingLogInput) error {
 	if in.Pace == "" {
 		return apperrors.BadRequest("pace は必須です")
 	}
-	if in.Kind < 0 || in.Kind > 3 {
-		return apperrors.BadRequest("kind は 0-3 の範囲で指定してください")
+	if in.Kind < 0 || in.Kind > 4 {
+		return apperrors.BadRequest("kind は 0-4 の範囲で指定してください")
 	}
 	if in.ShoeID == 0 {
 		return apperrors.BadRequest("shoe_id は必須です")

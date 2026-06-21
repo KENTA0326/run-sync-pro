@@ -4,20 +4,25 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/KENTA0326/run-sync-pro/database"
 	"github.com/KENTA0326/run-sync-pro/handler"
-	"github.com/KENTA0326/run-sync-pro/internal/cache"
-	"github.com/KENTA0326/run-sync-pro/service"
 	"github.com/KENTA0326/run-sync-pro/internal/apperrors"
+	"github.com/KENTA0326/run-sync-pro/internal/cache"
+	"github.com/KENTA0326/run-sync-pro/internal/config"
 	"github.com/KENTA0326/run-sync-pro/internal/grpcserver"
 	"github.com/KENTA0326/run-sync-pro/internal/httpserver"
 	"github.com/KENTA0326/run-sync-pro/internal/logging"
+	"github.com/KENTA0326/run-sync-pro/internal/repository"
 	"github.com/KENTA0326/run-sync-pro/internal/response"
+	"github.com/KENTA0326/run-sync-pro/internal/usecase"
 	"github.com/KENTA0326/run-sync-pro/internal/validation"
 	"github.com/KENTA0326/run-sync-pro/middleware"
+	"github.com/KENTA0326/run-sync-pro/internal/domainservice"
+	"github.com/KENTA0326/run-sync-pro/internal/infrastructure/auth"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
@@ -30,13 +35,42 @@ func main() {
 	if redisClient != nil {
 		analysisCache = cache.NewMonthlyAnalysis(redisClient)
 	}
+
+	// 組み立て: domain.Repository → usecase → handler（Interface Adapters）
+	// 計算・JWT 等の具象は domainservice / infrastructure/auth から注入する。
+	userRepo := repository.NewUserRepository(database.DB)
+	shoeRepo := repository.NewShoeRepository(database.DB)
+	trainingLogRepo := repository.NewTrainingLogRepository(database.DB)
+	passwordResetRepo := repository.NewPasswordResetRepository(database.DB)
+
+	authInfra := auth.NewAuth()
+	authUC := usecase.NewAuthUseCase(userRepo, authInfra)
+	shoeUC := usecase.NewShoeUseCase(shoeRepo)
+	trainingLogUC := usecase.NewTrainingLogUseCase(trainingLogRepo, shoeRepo)
+	passwordResetUC := usecase.NewPasswordResetUseCase(userRepo, passwordResetRepo, authInfra)
+
 	h := handler.NewHandlers(
 		database.DB,
-		service.NewAuth(),
-		service.NewAnalyzer(),
+		authInfra,
+		authUC,
+		shoeUC,
+		trainingLogUC,
+		passwordResetUC,
+		domainservice.NewAnalyzer(),
 		analysisCache,
-		service.NewVDOTCalculator(),
-		service.NewMarathonSplits(),
+		domainservice.NewVDOTCalculator(),
+		domainservice.NewMarathonSplits(),
+		func() time.Duration {
+			minStr := config.ResolveString("", "PASSWORD_RESET_TOKEN_TTL_MINUTES", "60")
+			min, err := strconv.Atoi(minStr)
+			if err != nil || min <= 0 {
+				min = 60
+			}
+			return time.Duration(min) * time.Minute
+		},
+		func() string {
+			return config.ResolveString("", "FRONTEND_BASE_URL", "http://localhost:3001")
+		},
 	)
 
 	r := gin.New()

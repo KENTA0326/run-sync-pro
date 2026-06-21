@@ -50,6 +50,7 @@ func registerAPIv1(r *gin.Engine, h *handler.Handlers) {
 		authz.GET("/training-logs", middleware.RequirePermission(h.DB(), domain.ResourceTrainingLog, domain.ActionRead), h.ListTrainingLogs)
 		authz.POST("/training-logs", middleware.RequirePermission(h.DB(), domain.ResourceTrainingLog, domain.ActionWrite), h.CreateTrainingLog)
 		authz.GET("/training-logs/:id", middleware.RequirePermission(h.DB(), domain.ResourceTrainingLog, domain.ActionRead), h.GetTrainingLog)
+		authz.PATCH("/training-logs/:id/kind", middleware.RequirePermission(h.DB(), domain.ResourceTrainingLog, domain.ActionWrite), h.UpdateTrainingLogKind)
 
 		authz.GET("/analysis/monthly", middleware.RequirePermission(h.DB(), domain.ResourceAnalysis, domain.ActionRead), h.MonthlyReport)
 
@@ -83,6 +84,7 @@ func registerLegacyRoutes(r *gin.Engine, h *handler.Handlers) {
 		legacyAuth.GET("/training-logs/formatted", middleware.RequirePermission(h.DB(), domain.ResourceTrainingLog, domain.ActionRead), h.ListTrainingLogsFormatted)
 		legacyAuth.POST("/training-logs", middleware.RequirePermission(h.DB(), domain.ResourceTrainingLog, domain.ActionWrite), h.CreateTrainingLog)
 		legacyAuth.GET("/training-logs/:id", middleware.RequirePermission(h.DB(), domain.ResourceTrainingLog, domain.ActionRead), h.GetTrainingLog)
+		legacyAuth.PATCH("/training-logs/:id/kind", middleware.RequirePermission(h.DB(), domain.ResourceTrainingLog, domain.ActionWrite), h.UpdateTrainingLogKind)
 		legacyAuth.POST("/training-logs/stream", middleware.RequirePermission(h.DB(), domain.ResourceTrainingLog, domain.ActionWrite), h.ImportTrainingLogsStream)
 		legacyAuth.POST("/training-logs/import/csv", middleware.RequirePermission(h.DB(), domain.ResourceTrainingLog, domain.ActionWrite), h.ImportTrainingLogsCSV)
 

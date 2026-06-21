@@ -136,6 +136,10 @@ export interface CreateTrainingLogRequest {
   shoe_id: number
 }
 
+export interface UpdateTrainingLogKindRequest {
+  kind: number
+}
+
 export interface ImportTrainingLogsResponse {
   message: string
   created_count: number

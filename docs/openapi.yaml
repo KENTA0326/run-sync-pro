@@ -993,8 +993,8 @@ components:
         kind:
           type: integer
           minimum: 0
-          maximum: 3
-          description: "0:ジョグ, 1:LSD, 2:ペース走, 3:インターバル"
+          maximum: 4
+          description: "0:ジョグ, 1:LSD, 2:ペース走, 3:インターバル, 4:レース"
         shoe_id:
           type: integer
           format: uint

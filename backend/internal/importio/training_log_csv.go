@@ -156,8 +156,8 @@ func parseTrainingLogCSVRow(row []string, col map[string]int) (TrainingLogCSVRec
 	}
 
 	kind, err := strconv.Atoi(get("kind"))
-	if err != nil || kind < 0 || kind > 3 {
-		return TrainingLogCSVRecord{}, fmt.Errorf("kind は 0-3 の範囲で指定してください")
+	if err != nil || kind < 0 || kind > 4 {
+		return TrainingLogCSVRecord{}, fmt.Errorf("kind は 0-4 の範囲で指定してください")
 	}
 
 	shoeID, err := strconv.ParseUint(get("shoe_id"), 10, 64)

@@ -8,12 +8,63 @@ cp .env.example .env
 # 必要に応じて .env を編集
 
 # 起動
-docker compose up -d
+docker compose up --build -d
 ```
 
-- バックエンド: http://localhost:8080
-- フロントエンド: http://localhost:3001
-- DB: localhost:5432（POSTGRES_* は .env を参照）
+## Docker コマンド一覧
+
+### 起動
+
+```bash
+# 全サービスをビルド＆バックグラウンド起動（推奨）
+docker compose up --build -d
+
+# フォアグラウンドで起動（ログをリアルタイムで見たい場合）
+docker compose up --build
+```
+
+### 確認
+
+```bash
+# コンテナの状態確認
+docker compose ps
+
+# バックエンドのログ確認（末尾10行）
+docker compose logs --tail 10 backend
+
+# 全サービスのログをリアルタイムで追跡
+docker compose logs -f
+```
+
+### 個別操作
+
+```bash
+# バックエンドだけ再ビルド＆再起動
+docker compose up -d --build backend
+
+# バックエンドだけ再起動（ビルドなし）
+docker compose restart backend
+```
+
+### 停止
+
+```bash
+# 全サービス停止
+docker compose down
+
+# 全サービス停止 + DBデータも削除（完全リセット）
+docker compose down -v
+```
+
+### アクセス先
+
+| サービス | URL | 備考 |
+|---------|-----|------|
+| フロントエンド | http://localhost:3001 | Nuxt (開発モード) |
+| バックエンド API | http://localhost:8080 | Gin + Air (ホットリロード) |
+| Swagger UI | http://localhost:8081 | API ドキュメント |
+| PostgreSQL | localhost:5432 | `.env` の POSTGRES_* を参照 |
+| Redis | localhost:6379 | キャッシュ |
 
 ## ビルド設定
 
