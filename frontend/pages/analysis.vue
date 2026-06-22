@@ -88,29 +88,27 @@
         <!-- VDOT推移グラフ -->
         <div v-if="analysis?.monthly_reports?.length" class="rounded-lg border border-gray-200 bg-gray-50/50 p-4">
           <h2 class="mb-3 text-lg font-semibold text-gray-800">VDOT推移</h2>
-          <div class="mb-3 inline-flex rounded border border-gray-200 bg-white p-1 text-sm">
-            <button
-              type="button"
-              class="rounded px-3 py-1"
-              :class="vdotTrendScope === 'all' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-100'"
-              @click="vdotTrendScope = 'all'"
-            >
-              全期間
-            </button>
-            <button
-              type="button"
-              class="rounded px-3 py-1"
-              :class="vdotTrendScope === 'recent3' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-100'"
-              @click="vdotTrendScope = 'recent3'"
-            >
-              直近3ヶ月
-            </button>
-          </div>
+          <VdotScopeToggle v-model="vdotTrendScope" class="mb-3" />
           <p class="mb-4 text-sm text-gray-600">
             月ごとの走行から算出したVDOT（走力指標）の推移です。最高VDOTはその月のベスト走、平均VDOTは月内の平均的な走力の目安です。
+            グラフの点をクリックすると、その月のデータを強調表示できます。
+          </p>
+          <p v-if="selectedVdotMonth" class="mb-3 text-sm text-blue-700">
+            選択中: {{ formatYearMonth(selectedVdotMonth) }}
+            <button
+              type="button"
+              class="ml-2 text-xs text-blue-600 underline hover:text-blue-800"
+              @click="selectedVdotMonth = ''"
+            >
+              解除
+            </button>
           </p>
           <ClientOnly>
-            <VdotTrendChart v-if="displayedVdotReports.length" :monthly-reports="displayedVdotReports" />
+            <VdotTrendChart
+              v-if="displayedVdotReports.length"
+              :monthly-reports="displayedVdotReports"
+              @select-month="selectedVdotMonth = $event"
+            />
             <p v-else class="py-4 text-center text-sm text-gray-500">VDOTを算出できる走行がまだありません（距離・タイムが有効なログが必要です）</p>
           </ClientOnly>
         </div>
@@ -135,6 +133,7 @@
                   v-for="m in displayedVdotReports"
                   :key="m.year_month"
                   class="hover:bg-gray-50"
+                  :class="selectedVdotMonth === m.year_month ? 'bg-blue-50 ring-1 ring-inset ring-blue-200' : ''"
                 >
                   <td class="px-4 py-2 font-medium text-gray-800">{{ formatYearMonth(m.year_month) }}</td>
                   <td class="px-4 py-2 text-gray-700">{{ m.total_distance.toFixed(1) }}</td>
@@ -202,6 +201,7 @@ const recentRaceLogs = ref<TrainingLog[]>([])
 const loading = ref(true)
 const error = ref('')
 const vdotTrendScope = ref<'all' | 'recent3'>('all')
+const selectedVdotMonth = ref('')
 
 function formatPace(secPerKm: number): string {
   if (!secPerKm || Number.isNaN(secPerKm)) return '-'

@@ -25,6 +25,8 @@ var bindingRules = map[string]struct{}{
 	"lowercase": {}, "uppercase": {}, "number": {}, "numeric": {}, "hexadecimal": {},
 	"hexcolor": {}, "rgb": {}, "rgba": {}, "hsl": {}, "hsla": {}, "latitude": {}, "longitude": {},
 	"ssn": {}, "cron": {}, "mongodb": {}, "iscolor": {}, "isbn": {}, "issn": {},
+	// internal/validation/custom.go で RegisterGinBindingValidators により登録
+	"caldate": {}, "caldate_not_future": {},
 }
 
 // GORM のよく使う句（誤記検出用・網羅ではない）。

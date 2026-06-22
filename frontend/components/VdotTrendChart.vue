@@ -15,6 +15,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js'
+import type { ChartOptions } from 'chart.js'
 import { Line } from 'vue-chartjs'
 import type { MonthlyReport } from '~/types/api'
 
@@ -32,8 +33,16 @@ const props = defineProps<{
   monthlyReports: MonthlyReport[]
 }>()
 
+const emit = defineEmits<{
+  'select-month': [yearMonth: string]
+}>()
+
+const chartReports = computed(() => {
+  return props.monthlyReports?.filter(m => m.max_vdot > 0 || m.avg_vdot > 0) ?? []
+})
+
 const chartData = computed(() => {
-  const list = props.monthlyReports?.filter(m => m.max_vdot > 0 || m.avg_vdot > 0) ?? []
+  const list = chartReports.value
   if (list.length === 0) return null
   return {
     labels: list.map(m => formatLabel(m.year_month)),
@@ -58,12 +67,20 @@ const chartData = computed(() => {
   }
 })
 
-const chartOptions = {
+const chartOptions = computed<ChartOptions<'line'>>(() => ({
   responsive: true,
   maintainAspectRatio: false,
+  onClick: (_event, elements) => {
+    if (elements.length === 0) return
+    const index = elements[0].index
+    const yearMonth = chartReports.value[index]?.year_month
+    if (yearMonth) {
+      emit('select-month', yearMonth)
+    }
+  },
   plugins: {
     legend: {
-      position: 'top' as const,
+      position: 'top',
     },
     title: {
       display: false,
@@ -78,7 +95,7 @@ const chartOptions = {
       },
     },
   },
-}
+}))
 
 function formatLabel(ym: string): string {
   if (!ym || ym.length < 7) return ym
