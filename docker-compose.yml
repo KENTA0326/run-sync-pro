@@ -12,6 +12,15 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
 
+  redis:
+    image: redis:7-alpine
+    container_name: run-sync-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
   backend:
     build:
       context: ./backend
@@ -23,12 +32,14 @@ services:
     environment:
       # .env の POSTGRES_* から組み立て。DATABASE_URL を .env に書けばそちらが優先される
       DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable&TimeZone=Asia/Tokyo"
+      REDIS_URL: "redis://redis:6379/0"
     volumes:
       - ./backend:/app
     tty: true
     stdin_open: true
     depends_on:
       - db
+      - redis
 
   frontend:
     build:
@@ -42,5 +53,16 @@ services:
     environment:
       - NODE_ENV=development
 
+  swagger-ui:
+    image: swaggerapi/swagger-ui
+    container_name: run-sync-swagger
+    ports:
+      - "8081:8080"
+    environment:
+      SWAGGER_JSON: /spec/openapi.yaml
+    volumes:
+      - ./docs:/spec
+
 volumes:
   db-data:
+  redis-data:

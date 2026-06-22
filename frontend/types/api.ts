@@ -13,6 +13,24 @@ export interface LoginResponse {
   token: string
 }
 
+export interface PasswordResetRequestBody {
+  email: string
+}
+
+export interface PasswordResetRequestResponse {
+  message: string
+  reset_url?: string
+}
+
+export interface PasswordResetConfirmBody {
+  token: string
+  new_password: string
+}
+
+export interface PasswordResetConfirmResponse {
+  message: string
+}
+
 export interface SignUpRequest {
   name: string
   email: string
@@ -75,6 +93,23 @@ export interface CreateShoeRequest {
   purchase_date: string
 }
 
+export interface PaginationMeta {
+  limit: number
+  offset: number
+  total: number
+}
+
+export interface PaginatedTrainingLogsResponse {
+  items: TrainingLog[]
+  pagination: PaginationMeta
+}
+
+export interface ListShoesResponse {
+  shoes: Shoe[]
+  brands: string[]
+  pagination: PaginationMeta
+}
+
 // --- 走行ログ ---
 export interface TrainingLog {
   id: number
@@ -99,6 +134,15 @@ export interface CreateTrainingLogRequest {
   memo: string
   kind: number
   shoe_id: number
+}
+
+export interface UpdateTrainingLogKindRequest {
+  kind: number
+}
+
+export interface ImportTrainingLogsResponse {
+  message: string
+  created_count: number
 }
 
 // --- Splits ---
@@ -137,7 +181,12 @@ export interface AnalysisResponse {
   total_run_count: number
 }
 
-// --- エラー（BE の gin.H{"error": "..."} に合わせる）---
+// --- エラー（BE の { error: { code, message } } に合わせる）---
+export interface ApiErrorDetail {
+  code: string
+  message: string
+}
+
 export interface ApiErrorBody {
-  error: string
+  error: ApiErrorDetail | string
 }

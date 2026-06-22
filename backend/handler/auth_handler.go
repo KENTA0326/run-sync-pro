@@ -5,7 +5,8 @@ import (
 	"net/http"
 
 	"github.com/KENTA0326/run-sync-pro/internal/apperrors"
-	"github.com/KENTA0326/run-sync-pro/model"
+	"github.com/KENTA0326/run-sync-pro/internal/domain"
+	"github.com/KENTA0326/run-sync-pro/internal/usecase"
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,43 +24,23 @@ func (h *Handlers) SignUp(c *gin.Context) {
 		return
 	}
 
-	email, err := model.NewEmail(input.Email)
-	if err != nil {
-		if errors.Is(err, model.ErrInvalidEmail) {
-			respondHTTPError(c, apperrors.BadRequest("メールアドレスの形式が正しくありません", err))
-			return
-		}
-		respondHTTPError(c, apperrors.BadRequest("メールアドレスの入力を確認してください", err))
-		return
-	}
-
-	var dupCount int64
-	if err := h.db.Model(&model.User{}).Where("email = ?", email.String()).Count(&dupCount).Error; err != nil {
-		respondHTTPError(c, apperrors.InternalMsg("ユーザー登録処理に失敗しました", apperrors.Annotate("count user by email", err)))
-		return
-	}
-	if dupCount > 0 {
-		respondHTTPError(c, apperrors.ConflictMsg("このメールアドレスは既に登録されています"))
-		return
-	}
-
-	hashedPassword, err := h.auth.HashPassword(input.Password)
-	if err != nil {
-		respondHTTPError(c, apperrors.InternalMsg("ユーザー作成処理に失敗しました", apperrors.Annotate("hash password", err)))
-		return
-	}
-
-	user := model.User{
+	out, err := h.authUC.SignUp(c.Request.Context(), usecase.SignUpInput{
 		Name:     input.Name,
-		Email:    email,
-		Password: hashedPassword,
-	}
-
-	if err := h.db.Create(&user).Error; err != nil {
-		respondHTTPError(c, apperrors.InternalMsg("ユーザー作成に失敗しました", apperrors.Annotate("db create user", err)))
+		Email:    input.Email,
+		Password: input.Password,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrInvalidEmail):
+			respondHTTPError(c, apperrors.BadRequest("メールアドレスの形式が正しくありません", err))
+		case errors.Is(err, domain.ErrUserDuplicate):
+			respondHTTPError(c, apperrors.ConflictMsg("このメールアドレスは既に登録されています"))
+		default:
+			respondHTTPError(c, apperrors.InternalMsg("ユーザー作成処理に失敗しました", apperrors.Annotate("signup usecase", err)))
+		}
 		return
 	}
-
+	_ = out
 	c.JSON(http.StatusOK, gin.H{"message": "登録完了！"})
 }
 
@@ -76,47 +57,35 @@ func (h *Handlers) Login(c *gin.Context) {
 		return
 	}
 
-	email, err := model.NewEmail(input.Email)
+	out, err := h.authUC.Login(c.Request.Context(), usecase.LoginInput{
+		Email:    input.Email,
+		Password: input.Password,
+	})
 	if err != nil {
-		if errors.Is(err, model.ErrInvalidEmail) {
+		switch {
+		case errors.Is(err, domain.ErrInvalidEmail):
 			respondHTTPError(c, apperrors.BadRequest("メールアドレスの形式が正しくありません", err))
-			return
-		}
-		respondHTTPError(c, apperrors.BadRequest("メールアドレスの入力を確認してください", err))
-		return
-	}
-
-	var user model.User
-	if err := h.db.Where("email = ?", email.String()).First(&user).Error; err != nil {
-		mapped := apperrors.FromGORM(err)
-		if errors.Is(mapped, apperrors.ErrNotFound) {
+		case errors.Is(err, domain.ErrUserNotFound):
 			respondHTTPError(c, apperrors.UnauthorizedMsg("メールアドレスまたはパスワードが正しくありません"))
-			return
+		default:
+			respondHTTPError(c, apperrors.InternalMsg("ログイン処理に失敗しました", apperrors.Annotate("login usecase", err)))
 		}
-		respondHTTPError(c, apperrors.InternalMsg("ログイン処理に失敗しました", apperrors.Annotate("db find user", mapped)))
 		return
 	}
 
-	if !h.auth.CheckPassword(input.Password, user.Password) {
-		respondHTTPError(c, apperrors.UnauthorizedMsg("メールアドレスまたはパスワードが正しくありません"))
-		return
-	}
-
-	token, err := h.auth.GenerateToken(user.ID)
-	if err != nil {
-		respondHTTPError(c, apperrors.InternalMsg("トークン発行に失敗しました", apperrors.Annotate("generate token", err)))
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"token": token})
+	c.JSON(http.StatusOK, gin.H{"token": out.Token})
 }
 
 // CurrentUser は JWT からユーザー ID を返す（認証確認・デバッグ用）。
 // ルート: GET /api/v1/users/me （レガシー: GET /auth/me）。
 func (h *Handlers) CurrentUser(c *gin.Context) {
-	userID, _ := c.Get("userID")
+	userID, ok := domain.UserIDFromRequest(c.Request)
+	if !ok {
+		respondHTTPError(c, apperrors.UnauthorizedMsg("ユーザー情報を取得できません"))
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"user_id": userID,
+		"user_id": userID.Uint(),
 		"message": "認証に成功しています！",
 	})
 }

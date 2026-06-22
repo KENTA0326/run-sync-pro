@@ -1,8 +1,9 @@
 package model
 
 import (
-	"gorm.io/gorm"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type User struct {
@@ -14,4 +15,6 @@ type User struct {
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	Shoes        []Shoe        `gorm:"foreignKey:UserID;references:ID" json:"-"`
+	TrainingLogs []TrainingLog `gorm:"foreignKey:UserID;references:ID" json:"-"`
 }

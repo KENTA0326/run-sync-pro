@@ -1,0 +1,1 @@
+DROP INDEX CONCURRENTLY IF EXISTS idx_shoes_created_by;

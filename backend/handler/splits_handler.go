@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/KENTA0326/run-sync-pro/internal/apperrors"
-	"github.com/KENTA0326/run-sync-pro/service"
+	"github.com/KENTA0326/run-sync-pro/model"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,7 +16,7 @@ type FullMarathonSplitsInput struct {
 type FullMarathonSplitsResponse struct {
 	Page       int                `json:"page"`
 	TotalPages int                `json:"total_pages"`
-	Rows       []service.SplitRow `json:"rows"`
+	Rows       []model.SplitRow `json:"rows"`
 }
 
 // FullMarathonSplits は「フルマラソン(42.195km)の1kmごとの通過タイム」を返す（10km単位ページング）。

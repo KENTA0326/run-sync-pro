@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/KENTA0326/run-sync-pro/internal/apperrors"
+	"github.com/KENTA0326/run-sync-pro/internal/logging"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,19 +18,24 @@ func respondHTTPError(c *gin.Context, err error) bool {
 	}
 	var v *apperrors.Visible
 	if errors.As(err, &v) {
-		c.JSON(v.HTTP, gin.H{"error": v.Msg})
+		writeAPIError(c, v.HTTP, codeFromVisible(v), v.Msg)
 		return true
 	}
-	if errors.Is(err, apperrors.ErrNotFound) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "リソースが見つかりません"})
-		return true
+	switch {
+	case errors.Is(err, apperrors.ErrNotFound):
+		writeAPIError(c, http.StatusNotFound, apperrors.CodeNotFound, "リソースが見つかりません")
+	case errors.Is(err, apperrors.ErrUnauthorized):
+		writeAPIError(c, http.StatusUnauthorized, apperrors.CodeUnauthorized, "認証に失敗しました")
+	case errors.Is(err, apperrors.ErrConflict):
+		writeAPIError(c, http.StatusConflict, apperrors.CodeConflict, "競合が発生しました")
+	default:
+		logCtx := context.Background()
+		if c.Request != nil {
+			logCtx = c.Request.Context()
+		}
+		logging.FromGin(c).ErrorContext(logCtx, "handler_unhandled_error", slog.Any("err", err))
+		writeAPIError(c, http.StatusInternalServerError, apperrors.CodeInternal, "サーバー内部でエラーが発生しました")
 	}
-	if errors.Is(err, apperrors.ErrUnauthorized) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "認証に失敗しました"})
-		return true
-	}
-	log.Printf("handler error: %v", err)
-	c.JSON(http.StatusInternalServerError, gin.H{"error": "サーバー内部でエラーが発生しました"})
 	return true
 }
 

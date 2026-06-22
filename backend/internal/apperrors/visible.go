@@ -32,7 +32,7 @@ func newVisible(status int, msg string, inner error) error {
 
 // BadRequest は 400。InvalidInput を連鎖に載せる。
 func BadRequest(msg string, cause ...error) error {
-	var inner error = ErrInvalidInput
+	var inner = ErrInvalidInput
 	if len(cause) > 0 && cause[0] != nil {
 		inner = fmt.Errorf("%w: %w", ErrInvalidInput, cause[0])
 	}
@@ -46,7 +46,7 @@ func UnauthorizedMsg(msg string) error {
 
 // NotFoundMsg は 404。NotFound センチネルを連鎖に載せる。
 func NotFoundMsg(msg string, cause ...error) error {
-	var inner error = ErrNotFound
+	var inner = ErrNotFound
 	if len(cause) > 0 && cause[0] != nil {
 		inner = fmt.Errorf("%w: %w", ErrNotFound, cause[0])
 	}
@@ -55,7 +55,7 @@ func NotFoundMsg(msg string, cause ...error) error {
 
 // ConflictMsg は 409。
 func ConflictMsg(msg string, cause ...error) error {
-	var inner error = ErrConflict
+	var inner = ErrConflict
 	if len(cause) > 0 && cause[0] != nil {
 		inner = fmt.Errorf("%w: %w", ErrConflict, cause[0])
 	}

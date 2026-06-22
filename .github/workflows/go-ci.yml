@@ -17,6 +17,22 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: runsync_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U user -d runsync_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://user:password@localhost:5432/runsync_test?sslmode=disable&TimeZone=Asia/Tokyo
     steps:
       - uses: actions/checkout@v4
 
@@ -29,6 +45,9 @@ jobs:
       - name: Go test (race)
         run: go test -race -count=1 ./...
 
+      - name: Migration reversibility (up / down / up)
+        run: go test -count=1 -run TestMigrationsReversible ./database
+
       - name: go vet
         run: go vet ./...
 
@@ -36,8 +55,8 @@ jobs:
         run: go run ./cmd/tagcheck .
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
-          version: latest
+          version: v2.4.0
           working-directory: backend
           args: --timeout=3m

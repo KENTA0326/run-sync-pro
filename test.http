@@ -1,7 +1,7 @@
-### API が 8080 に届いているか（404 の切り分け用）
+### ヘルス
 GET http://localhost:8080/api/v1/health
 
-### ユーザー登録（現行 API）
+### ユーザー登録
 POST http://localhost:8080/api/v1/auth/signup
 Content-Type: application/json
 
@@ -11,10 +11,7 @@ Content-Type: application/json
   "password": "password123"
 }
 
-### レガシー別名（同じハンドラ）
-# POST http://localhost:8080/signup
-
-### ログイン（現行 API）
+### ログイン
 POST http://localhost:8080/api/v1/auth/login
 Content-Type: application/json
 
@@ -23,6 +20,27 @@ Content-Type: application/json
   "password": "password123"
 }
 
-### 認証が必要（現行: /api/v1/users/me、レガシー: /auth/me）
+### 認証確認
 GET http://localhost:8080/api/v1/users/me
-Authorization: Bearer <login で返った token を貼る>
+Authorization: Bearer <token>
+
+### シューズ1件取得（パスパラメータ）
+GET http://localhost:8080/api/v1/shoes/1
+Authorization: Bearer <token>
+
+### 走行ログ1件取得（パスパラメータ）
+GET http://localhost:8080/api/v1/training-logs/1
+Authorization: Bearer <token>
+
+### VDOT 計算
+POST http://localhost:8080/api/v1/vdot/calculate
+Content-Type: application/json
+
+{
+  "distance_meters": 10000,
+  "time_seconds": 2400
+}
+
+### 月別レポート
+GET http://localhost:8080/api/v1/analysis/monthly
+Authorization: Bearer <token>

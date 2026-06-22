@@ -87,7 +87,7 @@
 
 <script setup lang="ts">
 import { apiPath } from '~/composables/apiPaths'
-import type { CreateShoeRequest, Shoe } from '~/types/api'
+import type { CreateShoeRequest, ListShoesResponse, Shoe } from '~/types/api'
 
 definePageMeta({
   middleware: 'auth',
@@ -112,8 +112,8 @@ async function fetchShoes() {
   loading.value = true
   error.value = ''
   try {
-    const data = await api.get<Shoe[]>(apiPath.shoes)
-    shoes.value = data
+    const data = await api.get<ListShoesResponse>(apiPath.shoes, { limit: 500 })
+    shoes.value = data.shoes
   } catch (err) {
     error.value = api.getErrorMessage(err)
   } finally {

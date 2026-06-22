@@ -1,43 +1,55 @@
 package handler
 
-import (
-	"github.com/KENTA0326/run-sync-pro/service"
-	"gorm.io/gorm"
-)
+import "gorm.io/gorm"
 
 // Handlers は HTTP ハンドラとその依存（DB・ドメインサービス）をまとめる。
 type Handlers struct {
-	db       *gorm.DB
-	auth     Auth
-	analyzer TrainingAnalyzer
-	vdot     VDOTCalculator
-	splits   MarathonSplits
+	db               *gorm.DB
+	auth             Auth
+	authUC           AuthUseCasePort
+	shoeUC           ShoeUseCasePort
+	trainingLogUC    TrainingLogUseCasePort
+	passwordResetUC  PasswordResetUseCasePort
+	analyzer         TrainingAnalyzer
+	analysisCache    MonthlyAnalysisCache
+	vdot             VDOTCalculator
+	splits           MarathonSplits
+	passwordResetTTL PasswordResetTTLFunc
+	frontendBaseURL  FrontendBaseURLFunc
 }
 
-// NewHandlers は依存を明示的に渡して構築する（テストでモックを注入する想定）。
+// NewHandlers は依存を明示的に渡して構築する（main またはテストで具体実装・モックを注入する）。
 func NewHandlers(
 	db *gorm.DB,
 	auth Auth,
+	authUC AuthUseCasePort,
+	shoeUC ShoeUseCasePort,
+	trainingLogUC TrainingLogUseCasePort,
+	passwordResetUC PasswordResetUseCasePort,
 	analyzer TrainingAnalyzer,
+	analysisCache MonthlyAnalysisCache,
 	vdot VDOTCalculator,
 	splits MarathonSplits,
+	passwordResetTTL PasswordResetTTLFunc,
+	frontendBaseURL FrontendBaseURLFunc,
 ) *Handlers {
 	return &Handlers{
-		db:       db,
-		auth:     auth,
-		analyzer: analyzer,
-		vdot:     vdot,
-		splits:   splits,
+		db:               db,
+		auth:             auth,
+		authUC:           authUC,
+		shoeUC:           shoeUC,
+		trainingLogUC:    trainingLogUC,
+		passwordResetUC:  passwordResetUC,
+		analyzer:         analyzer,
+		analysisCache:    analysisCache,
+		vdot:             vdot,
+		splits:           splits,
+		passwordResetTTL: passwordResetTTL,
+		frontendBaseURL:  frontendBaseURL,
 	}
 }
 
-// NewDefaultHandlers は本番相当の service 具体実装で Handlers を組み立てる。
-func NewDefaultHandlers(db *gorm.DB) *Handlers {
-	return NewHandlers(
-		db,
-		service.NewAuth(),
-		service.NewAnalyzer(),
-		service.NewVDOTCalculator(),
-		service.NewMarathonSplits(),
-	)
+// DB はルーティング層でミドルウェアに注入するための参照を返す。
+func (h *Handlers) DB() *gorm.DB {
+	return h.db
 }

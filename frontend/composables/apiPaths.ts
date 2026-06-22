@@ -1,19 +1,21 @@
 /**
- * バックエンドの `internal/httpserver`（/api/v1）とパスを揃える。
- * 変更時は backend とここをセットで更新する。
+ * API パス（/api/v1）。
+ * - リソース操作: 名詞 + パスパラメータ（例: GET /shoes/:id）
+ * - 認証・計算など: 動詞・操作名をパスに含める
+ * - 走行ログ CSV: GET/POST /training-logs + Accept / Content-Type で切替
  */
-export const API_V1 = '/api/v1' as const
-
 export const apiPath = {
-  authSignup: `${API_V1}/auth/signup`,
-  authLogin: `${API_V1}/auth/login`,
-  shoes: `${API_V1}/shoes`,
-  shoe: (id: number | string) => `${API_V1}/shoes/${id}`,
-  trainingLogs: `${API_V1}/training-logs`,
-  trainingLogsFormatted: `${API_V1}/training-logs/formatted`,
-  trainingLogsImportStream: `${API_V1}/training-logs/import/stream`,
-  analysisMonthly: `${API_V1}/analysis/monthly`,
-  usersMe: `${API_V1}/users/me`,
-  vdotCalculate: `${API_V1}/vdot/calculate`,
-  splitsFullMarathon: `${API_V1}/splits/full-marathon`,
+  authSignup: '/api/v1/auth/signup',
+  authLogin: '/api/v1/auth/login',
+  authPasswordResetRequest: '/api/v1/auth/password-reset/request',
+  authPasswordResetConfirm: '/api/v1/auth/password-reset/confirm',
+  shoes: '/api/v1/shoes',
+  shoe: (id: number | string) => `/api/v1/shoes/${id}`,
+  trainingLogs: '/api/v1/training-logs',
+  trainingLog: (id: number | string) => `/api/v1/training-logs/${id}`,
+  trainingLogKind: (id: number | string) => `/api/v1/training-logs/${id}/kind`,
+  analysisMonthly: '/api/v1/analysis/monthly',
+  usersMe: '/api/v1/users/me',
+  vdotCalculate: '/api/v1/vdot/calculate',
+  splitsFullMarathon: '/api/v1/splits/full-marathon',
 } as const
