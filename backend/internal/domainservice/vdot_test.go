@@ -229,7 +229,7 @@ func TestCalculateRacePredictions_distanceOrdering(t *testing.T) {
 	t.Parallel()
 
 	got := CalculateRacePredictions(50.0)
-	if !(got.FiveKSeconds < got.TenKSeconds && got.TenKSeconds < got.HalfSeconds && got.HalfSeconds < got.FullSeconds) {
+	if got.FiveKSeconds >= got.TenKSeconds || got.TenKSeconds >= got.HalfSeconds || got.HalfSeconds >= got.FullSeconds {
 		t.Fatalf("unexpected ordering: %+v", got)
 	}
 	// 回帰用固定値

@@ -6,8 +6,8 @@ import (
 )
 
 // RegisterCallbacks は GORM コールバックを登録する。
-func RegisterCallbacks(db *gorm.DB) {
-	db.Callback().Create().Before("gorm:create").Register("domain:set_created_by", setCreatedByCallback)
+func RegisterCallbacks(db *gorm.DB) error {
+	return db.Callback().Create().Before("gorm:create").Register("domain:set_created_by", setCreatedByCallback)
 }
 
 func setCreatedByCallback(db *gorm.DB) {

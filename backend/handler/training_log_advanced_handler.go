@@ -33,10 +33,10 @@ type APIDate struct {
 }
 
 func (d APIDate) MarshalJSON() ([]byte, error) {
-	if d.Time.IsZero() {
+	if d.IsZero() {
 		return []byte("null"), nil
 	}
-	return json.Marshal(d.Time.Format(apiDateLayout))
+	return json.Marshal(d.Format(apiDateLayout))
 }
 
 func (d *APIDate) UnmarshalJSON(data []byte) error {
@@ -64,10 +64,10 @@ type APITimestamp struct {
 }
 
 func (t APITimestamp) MarshalJSON() ([]byte, error) {
-	if t.Time.IsZero() {
+	if t.IsZero() {
 		return []byte("null"), nil
 	}
-	return json.Marshal(t.Time.Format(apiTimeLayout))
+	return json.Marshal(t.Format(apiTimeLayout))
 }
 
 type trainingLogFormattedResponse struct {
@@ -195,7 +195,7 @@ func NewTrainingLogImportOptions(opts ...TrainingLogImportOption) (TrainingLogIm
 }
 
 func validateStreamTrainingLogInput(in streamTrainingLogInput) error {
-	if in.TrainingDate.Time.IsZero() {
+	if in.TrainingDate.IsZero() {
 		return apperrors.BadRequest("training_date は YYYY-MM-DD 形式で指定してください")
 	}
 	if in.Distance <= 0 {

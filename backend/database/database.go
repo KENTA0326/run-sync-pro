@@ -64,7 +64,10 @@ func Connect() {
 		os.Exit(1)
 	}
 
-	RegisterCallbacks(db)
+	if err := RegisterCallbacks(db); err != nil {
+		slog.Error("database_callbacks_failed", slog.Any("err", err))
+		os.Exit(1)
+	}
 
 	slog.Info("database_connected")
 	DB = db
